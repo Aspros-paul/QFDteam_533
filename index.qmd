@@ -1,7 +1,51 @@
 ---
-title: "YsTrades"
+title: "Quant Trading Homepage"
+author: "Quant Trading Team"
+date: "2025-04-03"
+format:
+  html:
+    theme: flatly
+    toc: true
+    css: styles.css
+    # Optionally include a hero image if available
+    # banner: "images/hero.jpg"
 ---
 
-This is a Quarto website.
+# Welcome
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+Welcome to our homepage! We use quantitative analysis to conduct trades, leveraging data-driven insights to guide our trading decisions.
+
+## About Us
+
+At Quant Trading, our team of data scientists and market experts employs advanced quantitative methods to unlock market opportunities. We blend statistical analysis with machine learning techniques to create robust trading strategies that adapt to ever-changing market conditions.
+
+## Our Strategies
+
+We deploy a range of sophisticated trading strategies, including:
+
+- **Algorithmic Trading:** Automated execution based on pre-defined mathematical models.
+- **Statistical Arbitrage:** Exploiting pricing inefficiencies between related assets.
+- **Machine Learning:** Utilizing predictive models to forecast market trends.
+
+## Market Performance
+
+Below is a sample visualization of our simulated market performance analysis:
+
+::: {.cell}
+```{python}
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Generate sample market performance data
+np.random.seed(0)
+x = np.linspace(0, 10, 100)
+y = np.sin(x) + np.random.normal(0, 0.3, 100)
+
+plt.figure(figsize=(8, 4))
+plt.plot(x, y, label='Market Performance')
+plt.xlabel('Time (Days)')
+plt.ylabel('Performance')
+plt.title('Simulated Market Trend')
+plt.legend()
+plt.tight_layout()
+plt.show()

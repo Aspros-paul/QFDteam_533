@@ -9,8 +9,29 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "YsTrades",
+    "title": "Quant Trading Homepage",
     "section": "",
-    "text": "This is a Quarto website.\nTo learn more about Quarto websites visit https://quarto.org/docs/websites."
+    "text": "Welcome to our homepage! We use quantitative analysis to conduct trades, leveraging data-driven insights to guide our trading decisions.\n\n\nAt Quant Trading, our team of data scientists and market experts employs advanced quantitative methods to unlock market opportunities. We blend statistical analysis with machine learning techniques to create robust trading strategies that adapt to ever-changing market conditions.\n\n\n\nWe deploy a range of sophisticated trading strategies, including:\n\nAlgorithmic Trading: Automated execution based on pre-defined mathematical models.\nStatistical Arbitrage: Exploiting pricing inefficiencies between related assets.\nMachine Learning: Utilizing predictive models to forecast market trends.\n\n\n\n\nBelow is a sample visualization of our simulated market performance analysis:\n\nimport matplotlib.pyplot as plt import numpy as np\n\n\nnp.random.seed(0) x = np.linspace(0, 10, 100) y = np.sin(x) + np.random.normal(0, 0.3, 100)\nplt.figure(figsize=(8, 4)) plt.plot(x, y, label=‘Market Performance’) plt.xlabel(‘Time (Days)’) plt.ylabel(‘Performance’) plt.title(‘Simulated Market Trend’) plt.legend() plt.tight_layout() plt.show()"
+  },
+  {
+    "objectID": "index.html#about-us",
+    "href": "index.html#about-us",
+    "title": "Quant Trading Homepage",
+    "section": "",
+    "text": "At Quant Trading, our team of data scientists and market experts employs advanced quantitative methods to unlock market opportunities. We blend statistical analysis with machine learning techniques to create robust trading strategies that adapt to ever-changing market conditions."
+  },
+  {
+    "objectID": "index.html#our-strategies",
+    "href": "index.html#our-strategies",
+    "title": "Quant Trading Homepage",
+    "section": "",
+    "text": "We deploy a range of sophisticated trading strategies, including:\n\nAlgorithmic Trading: Automated execution based on pre-defined mathematical models.\nStatistical Arbitrage: Exploiting pricing inefficiencies between related assets.\nMachine Learning: Utilizing predictive models to forecast market trends."
+  },
+  {
+    "objectID": "index.html#market-performance",
+    "href": "index.html#market-performance",
+    "title": "Quant Trading Homepage",
+    "section": "",
+    "text": "Below is a sample visualization of our simulated market performance analysis:\n\nimport matplotlib.pyplot as plt import numpy as np\n\n\nnp.random.seed(0) x = np.linspace(0, 10, 100) y = np.sin(x) + np.random.normal(0, 0.3, 100)\nplt.figure(figsize=(8, 4)) plt.plot(x, y, label=‘Market Performance’) plt.xlabel(‘Time (Days)’) plt.ylabel(‘Performance’) plt.title(‘Simulated Market Trend’) plt.legend() plt.tight_layout() plt.show()"
   }
 ]
