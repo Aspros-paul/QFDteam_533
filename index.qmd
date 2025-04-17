@@ -686,7 +686,7 @@ fig.show()
 
 ## Trading Blotter with Search
 
-Our trading ledger provides a comprehensive view of all trades executed by the strategy. Use the search box below to filter trades by date or any other characteristic:
+Our blotter provides a comprehensive view of all trades executed by the strategy. Use the search box below to filter trades by date or any other characteristic:
 
 ```{=html}
 <style>
