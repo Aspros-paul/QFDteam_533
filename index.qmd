@@ -9,6 +9,88 @@ format:
     code-fold: true
 ---
 
+```{=html}
+<!-- GitHub Button with improved positioning to avoid overlap with search button -->
+<style>
+/* Styles for GitHub button to be placed in the Quarto navbar */
+.navbar-github-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  margin-right: 15px; /* Add more margin to avoid overlap */
+}
+
+.navbar-github-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.navbar-github-button svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+/* Move the search button to the left a bit */
+.quarto-search {
+  margin-right: 50px !important; /* Add important to override default styles */
+}
+</style>
+
+<!-- Script to inject the GitHub button into the navbar after page loads -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Create GitHub button element
+  var githubButton = document.createElement('a');
+  githubButton.className = 'navbar-github-button';
+  githubButton.href = 'https://github.com/Aspros-paul/QFDteam_533';
+  githubButton.target = '_blank';
+  githubButton.setAttribute('aria-label', 'View on GitHub');
+  githubButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
+
+  // Function to handle navbar insertion with better positioning
+  function insertGitHubButton() {
+    // First, try to find the search button
+    var searchButton = document.querySelector('.quarto-search');
+
+    if (searchButton) {
+      // Move the search button to the left
+      searchButton.style.marginRight = '50px';
+
+      // Insert our GitHub button after the search button
+      searchButton.parentNode.insertBefore(githubButton, searchButton.nextSibling);
+    } else {
+      // If search button isn't found, try the right navbar section
+      var navbarRight = document.querySelector('.navbar-nav.navbar-nav-scroll.ms-auto');
+      if (navbarRight) {
+        // Create a list item for the button
+        var listItem = document.createElement('li');
+        listItem.className = 'nav-item';
+        listItem.appendChild(githubButton);
+
+        // Insert at the end of the right navbar
+        navbarRight.appendChild(listItem);
+      } else {
+        // Final fallback - if we can't find the right navbar section, append to the navbar container
+        var navbar = document.querySelector('.navbar-container');
+        if (navbar) {
+          navbar.appendChild(githubButton);
+        }
+      }
+    }
+  }
+
+  // Try inserting immediately
+  insertGitHubButton();
+
+  // Also try after a slight delay to ensure all Quarto elements are fully rendered
+  setTimeout(insertGitHubButton, 500);
+});
+</script>
+```
+
 ```{python}
 #| echo: false
 #| warning: false
