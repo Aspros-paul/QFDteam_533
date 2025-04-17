@@ -602,7 +602,7 @@ fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
 fig.show()
 ```
 
-## Trading Ledger with Search
+## Trading Blotter with Search
 
 Our trading ledger provides a comprehensive view of all trades executed by the strategy. Use the search box below to filter trades by date or any other characteristic:
 
