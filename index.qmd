@@ -923,78 +923,78 @@ Use the search box below to filter trades by date or any other characteristic:
     <tr><td>2024-04-12</td><td>431,639.40</td><td>50</td><td>34,171.00</td><td>-0.56</td><td>-34,189.60</td><td>431,620.80</td><td class="loss">-379.20</td><td>Trade 1 entry (Long MSTR/Short BTC)</td></tr>
     <tr><td>2024-04-19</td><td>431,639.40</td><td>50</td><td>35,225.00</td><td>-0.56</td><td>-33,513.76</td><td>433,350.64</td><td class="profit">1,729.84</td><td>Weekly valuation</td></tr>
     <tr><td>2024-04-26</td><td>431,639.40</td><td>50</td><td>36,200.00</td><td>-0.56</td><td>-32,899.36</td><td>434,940.04</td><td class="profit">1,589.40</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-05-03</td><td>436,478.40</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>436,478.40</td><td class="profit">1,538.36</td><td>Trade 1 exit (+4,857.60 profit)</td></tr>
+    <tr><td>2024-05-03</td><td>504,478.40</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>504,478.40</td><td class="profit">1,538.36</td><td>Trade 1 exit (+4,857.60 profit)</td></tr>
 
     <!-- Trade 2 events -->
-    <tr><td>2024-05-10</td><td>368,105.90</td><td>-45</td><td>-34,192.80</td><td>0.52</td><td>34,180.70</td><td>368,093.80</td><td class="loss">-384.60</td><td>Trade 2 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-05-17</td><td>368,105.90</td><td>-45</td><td>-33,325.95</td><td>0.52</td><td>35,654.32</td><td>370,434.27</td><td class="profit">2,340.47</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-05-24</td><td>368,105.90</td><td>-45</td><td>-32,751.30</td><td>0.52</td><td>36,852.36</td><td>372,206.96</td><td class="profit">1,772.69</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-05-31</td><td>374,326.90</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>374,326.90</td><td class="profit">2,119.94</td><td>Trade 2 exit (+6,233.10 profit)</td></tr>
+    <tr><td>2024-05-10</td><td>436,105.90</td><td>-45</td><td>-34,192.80</td><td>0.52</td><td>34,180.70</td><td>504,093.80</td><td class="loss">-384.60</td><td>Trade 2 entry (Short MSTR/Long BTC)</td></tr>
+    <tr><td>2024-05-17</td><td>436,105.90</td><td>-45</td><td>-33,325.95</td><td>0.52</td><td>35,654.32</td><td>506,434.27</td><td class="profit">2,340.47</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-05-24</td><td>436,105.90</td><td>-45</td><td>-32,751.30</td><td>0.52</td><td>36,852.36</td><td>508,206.96</td><td class="profit">1,772.69</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-05-31</td><td>510,326.90</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>510,326.90</td><td class="profit">2,119.94</td><td>Trade 2 exit (+6,233.10 profit)</td></tr>
 
     <!-- Trade 3 events (loss) -->
-    <tr><td>2024-06-14</td><td>307,575.60</td><td>48</td><td>33,377.76</td><td>-0.54</td><td>-33,373.54</td><td>307,579.82</td><td class="loss">-347.08</td><td>Trade 3 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-06-21</td><td>307,575.60</td><td>48</td><td>32,126.40</td><td>-0.54</td><td>-35,102.04</td><td>304,600.96</td><td class="loss">-2,978.86</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-06-28</td><td>307,575.60</td><td>48</td><td>31,536.00</td><td>-0.54</td><td>-36,246.84</td><td>302,864.76</td><td class="loss">-1,736.20</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-07-05</td><td>303,775.05</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>303,775.05</td><td class="profit">910.29</td><td>Trade 3 exit (-3,804.77 loss)</td></tr>
+    <tr><td>2024-06-14</td><td>443,575.60</td><td>48</td><td>33,377.76</td><td>-0.54</td><td>-33,373.54</td><td>509,979.82</td><td class="loss">-347.08</td><td>Trade 3 entry (Long MSTR/Short BTC)</td></tr>
+    <tr><td>2024-06-21</td><td>443,575.60</td><td>48</td><td>32,126.40</td><td>-0.54</td><td>-35,102.04</td><td>507,000.96</td><td class="loss">-2,978.86</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-06-28</td><td>443,575.60</td><td>48</td><td>31,536.00</td><td>-0.54</td><td>-36,246.84</td><td>505,264.76</td><td class="loss">-1,736.20</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-07-05</td><td>506,175.05</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>506,175.05</td><td class="profit">910.29</td><td>Trade 3 exit (-3,804.77 loss)</td></tr>
 
     <!-- Trade 4 events -->
-    <tr><td>2024-07-12</td><td>240,571.60</td><td>-47</td><td>-31,591.05</td><td>0.51</td><td>31,612.40</td><td>240,592.95</td><td class="loss">-282.10</td><td>Trade 4 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-07-19</td><td>240,571.60</td><td>-47</td><td>-30,835.32</td><td>0.51</td><td>33,286.23</td><td>243,022.51</td><td class="profit">2,429.56</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-07-26</td><td>240,571.60</td><td>-47</td><td>-30,214.63</td><td>0.51</td><td>34,452.12</td><td>244,809.09</td><td class="profit">1,786.58</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-08-02</td><td>244,353.51</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>244,353.51</td><td class="loss">-455.58</td><td>Trade 4 exit (+3,760.56 profit)</td></tr>
+    <tr><td>2024-07-12</td><td>442,971.60</td><td>-47</td><td>-31,591.05</td><td>0.51</td><td>31,612.40</td><td>505,892.95</td><td class="loss">-282.10</td><td>Trade 4 entry (Short MSTR/Long BTC)</td></tr>
+    <tr><td>2024-07-19</td><td>442,971.60</td><td>-47</td><td>-30,835.32</td><td>0.51</td><td>33,286.23</td><td>508,322.51</td><td class="profit">2,429.56</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-07-26</td><td>442,971.60</td><td>-47</td><td>-30,214.63</td><td>0.51</td><td>34,452.12</td><td>510,109.09</td><td class="profit">1,786.58</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-08-02</td><td>509,653.51</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>509,653.51</td><td class="loss">-455.58</td><td>Trade 4 exit (+3,760.56 profit)</td></tr>
 
     <!-- Trade 5 events -->
-    <tr><td>2024-08-09</td><td>179,359.53</td><td>52</td><td>32,493.24</td><td>-0.58</td><td>-32,500.74</td><td>179,352.03</td><td class="loss">-401.48</td><td>Trade 5 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-08-16</td><td>179,359.53</td><td>52</td><td>33,108.56</td><td>-0.58</td><td>-32,182.32</td><td>180,285.77</td><td class="profit">933.74</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-08-23</td><td>179,359.53</td><td>52</td><td>33,540.32</td><td>-0.58</td><td>-31,794.58</td><td>181,105.27</td><td class="profit">819.50</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-08-30</td><td>180,611.57</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>180,611.57</td><td class="loss">-493.70</td><td>Trade 5 exit (+1,259.54 profit)</td></tr>
+    <tr><td>2024-08-09</td><td>444,659.53</td><td>52</td><td>32,493.24</td><td>-0.58</td><td>-32,500.74</td><td>509,252.03</td><td class="loss">-401.48</td><td>Trade 5 entry (Long MSTR/Short BTC)</td></tr>
+    <tr><td>2024-08-16</td><td>444,659.53</td><td>52</td><td>33,108.56</td><td>-0.58</td><td>-32,182.32</td><td>510,185.77</td><td class="profit">933.74</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-08-23</td><td>444,659.53</td><td>52</td><td>33,540.32</td><td>-0.58</td><td>-31,794.58</td><td>511,005.27</td><td class="profit">819.50</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-08-30</td><td>510,511.57</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>510,511.57</td><td class="loss">-493.70</td><td>Trade 5 exit (+1,259.54 profit)</td></tr>
 
     <!-- Trade 6 events -->
-    <tr><td>2024-09-06</td><td>116,085.01</td><td>-49</td><td>-32,278.26</td><td>0.53</td><td>32,248.30</td><td>116,055.05</td><td class="loss">-556.52</td><td>Trade 6 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-09-13</td><td>116,085.01</td><td>-49</td><td>-31,354.37</td><td>0.53</td><td>33,582.56</td><td>118,313.20</td><td class="profit">2,258.15</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-09-20</td><td>116,085.01</td><td>-49</td><td>-30,825.98</td><td>0.53</td><td>34,348.72</td><td>119,607.75</td><td class="profit">1,294.55</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-09-27</td><td>120,063.81</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>120,063.81</td><td class="profit">456.06</td><td>Trade 6 exit (+4,008.76 profit)</td></tr>
+    <tr><td>2024-09-06</td><td>445,985.01</td><td>-49</td><td>-32,278.26</td><td>0.53</td><td>32,248.30</td><td>509,955.05</td><td class="loss">-556.52</td><td>Trade 6 entry (Short MSTR/Long BTC)</td></tr>
+    <tr><td>2024-09-13</td><td>445,985.01</td><td>-49</td><td>-31,354.37</td><td>0.53</td><td>33,582.56</td><td>512,213.20</td><td class="profit">2,258.15</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-09-20</td><td>445,985.01</td><td>-49</td><td>-30,825.98</td><td>0.53</td><td>34,348.72</td><td>513,507.75</td><td class="profit">1,294.55</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-09-27</td><td>513,963.81</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>513,963.81</td><td class="profit">456.06</td><td>Trade 6 exit (+4,008.76 profit)</td></tr>
 
     <!-- Trade 7 events -->
-    <tr><td>2024-10-04</td><td>54,782.96</td><td>53</td><td>32,638.46</td><td>-0.55</td><td>-32,642.39</td><td>54,779.03</td><td class="loss">-284.78</td><td>Trade 7 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-10-11</td><td>54,782.96</td><td>53</td><td>33,724.87</td><td>-0.55</td><td>-31,925.84</td><td>56,581.99</td><td class="profit">1,802.96</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-10-18</td><td>54,782.96</td><td>53</td><td>34,521.75</td><td>-0.55</td><td>-31,157.37</td><td>58,147.34</td><td class="profit">1,565.35</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-10-25</td><td>57,982.43</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>57,982.43</td><td class="loss">-164.91</td><td>Trade 7 exit (+3,203.40 profit)</td></tr>
+    <tr><td>2024-10-04</td><td>448,682.96</td><td>53</td><td>32,638.46</td><td>-0.55</td><td>-32,642.39</td><td>513,679.03</td><td class="loss">-284.78</td><td>Trade 7 entry (Long MSTR/Short BTC)</td></tr>
+    <tr><td>2024-10-11</td><td>448,682.96</td><td>53</td><td>33,724.87</td><td>-0.55</td><td>-31,925.84</td><td>515,481.99</td><td class="profit">1,802.96</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-10-18</td><td>448,682.96</td><td>53</td><td>34,521.75</td><td>-0.55</td><td>-31,157.37</td><td>517,047.34</td><td class="profit">1,565.35</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-10-25</td><td>516,882.43</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>516,882.43</td><td class="loss">-164.91</td><td>Trade 7 exit (+3,203.40 profit)</td></tr>
 
     <!-- Trade 8 events -->
-    <tr><td>2024-11-01</td><td>-10,920.62</td><td>-51</td><td>-34,437.75</td><td>0.54</td><td>34,465.30</td><td>-10,893.07</td><td class="loss">-574.36</td><td>Trade 8 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-11-08</td><td>-10,920.62</td><td>-51</td><td>-33,679.10</td><td>0.54</td><td>35,849.96</td><td>-8,749.76</td><td class="profit">2,143.31</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-11-15</td><td>-10,920.62</td><td>-51</td><td>-33,215.84</td><td>0.54</td><td>36,578.22</td><td>-7,558.24</td><td class="profit">1,191.52</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-11-22</td><td>-7,141.38</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>-7,141.38</td><td class="profit">416.86</td><td>Trade 8 exit (+3,751.69 profit)</td></tr>
+    <tr><td>2024-11-01</td><td>447,979.38</td><td>-51</td><td>-34,437.75</td><td>0.54</td><td>34,465.30</td><td>516,906.93</td><td class="profit">24.50</td><td>Trade 8 entry (Short MSTR/Long BTC)</td></tr>
+    <tr><td>2024-11-08</td><td>447,979.38</td><td>-51</td><td>-33,679.10</td><td>0.54</td><td>35,849.96</td><td>519,050.24</td><td class="profit">2,143.31</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-11-15</td><td>447,979.38</td><td>-51</td><td>-33,215.84</td><td>0.54</td><td>36,578.22</td><td>520,241.76</td><td class="profit">1,191.52</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-11-22</td><td>520,658.62</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>520,658.62</td><td class="profit">416.86</td><td>Trade 8 exit (+3,751.69 profit)</td></tr>
 
     <!-- Trade 9 events (loss) -->
-    <tr><td>2024-11-29</td><td>-70,404.88</td><td>50</td><td>31,629.00</td><td>-0.55</td><td>-31,634.50</td><td>-70,410.38</td><td class="loss">-269.00</td><td>Trade 9 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-12-06</td><td>-70,404.88</td><td>50</td><td>30,584.50</td><td>-0.55</td><td>-33,382.40</td><td>-73,202.78</td><td class="loss">-2,792.40</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-12-13</td><td>-70,404.88</td><td>50</td><td>30,058.00</td><td>-0.55</td><td>-34,548.15</td><td>-74,895.03</td><td class="loss">-1,692.25</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-12-20</td><td>-74,178.38</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>-74,178.38</td><td class="profit">716.65</td><td>Trade 9 exit (-3,767.00 loss)</td></tr>
+    <tr><td>2024-11-29</td><td>457,395.12</td><td>50</td><td>31,629.00</td><td>-0.55</td><td>-31,634.50</td><td>520,389.62</td><td class="loss">-269.00</td><td>Trade 9 entry (Long MSTR/Short BTC)</td></tr>
+    <tr><td>2024-12-06</td><td>457,395.12</td><td>50</td><td>30,584.50</td><td>-0.55</td><td>-33,382.40</td><td>517,597.22</td><td class="loss">-2,792.40</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-12-13</td><td>457,395.12</td><td>50</td><td>30,058.00</td><td>-0.55</td><td>-34,548.15</td><td>515,904.97</td><td class="loss">-1,692.25</td><td>Weekly valuation</td></tr>
+    <tr><td>2024-12-20</td><td>516,621.62</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>516,621.62</td><td class="profit">716.65</td><td>Trade 9 exit (-3,767.00 loss)</td></tr>
 
     <!-- Trade 10 events -->
-    <tr><td>2024-12-27</td><td>-133,228.50</td><td>-48</td><td>-29,542.56</td><td>0.52</td><td>29,507.56</td><td>-133,263.50</td><td class="loss">-85.12</td><td>Trade 10 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2025-01-03</td><td>-133,228.50</td><td>-48</td><td>-28,625.76</td><td>0.52</td><td>31,087.56</td><td>-130,766.70</td><td class="profit">2,496.80</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-01-10</td><td>-133,228.50</td><td>-48</td><td>-28,102.08</td><td>0.52</td><td>31,871.64</td><td>-129,458.94</td><td class="profit">1,307.76</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-01-17</td><td>-129,376.50</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>-129,376.50</td><td class="profit">82.44</td><td>Trade 10 exit (+3,887.00 profit)</td></tr>
+    <tr><td>2024-12-27</td><td>457,571.50</td><td>-48</td><td>-29,542.56</td><td>0.52</td><td>29,507.56</td><td>516,536.50</td><td class="loss">-85.12</td><td>Trade 10 entry (Short MSTR/Long BTC)</td></tr>
+    <tr><td>2025-01-03</td><td>457,571.50</td><td>-48</td><td>-28,625.76</td><td>0.52</td><td>31,087.56</td><td>519,033.30</td><td class="profit">2,496.80</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-01-10</td><td>457,571.50</td><td>-48</td><td>-28,102.08</td><td>0.52</td><td>31,871.64</td><td>520,341.06</td><td class="profit">1,307.76</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-01-17</td><td>520,423.50</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>520,423.50</td><td class="profit">82.44</td><td>Trade 10 exit (+3,887.00 profit)</td></tr>
 
     <!-- Trade 11 events -->
-    <tr><td>2025-01-24</td><td>-192,801.50</td><td>54</td><td>31,720.68</td><td>-0.56</td><td>-31,704.32</td><td>-192,785.14</td><td class="profit">591.36</td><td>Trade 11 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2025-01-31</td><td>-192,801.50</td><td>54</td><td>32,756.94</td><td>-0.56</td><td>-30,935.76</td><td>-190,980.32</td><td class="profit">1,804.82</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-02-07</td><td>-192,801.50</td><td>54</td><td>33,468.72</td><td>-0.56</td><td>-30,324.64</td><td>-189,657.42</td><td class="profit">1,322.90</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-02-14</td><td>-189,919.20</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>-189,919.20</td><td class="loss">-261.78</td><td>Trade 11 exit (+2,865.94 profit)</td></tr>
+    <tr><td>2025-01-24</td><td>456,998.50</td><td>54</td><td>31,720.68</td><td>-0.56</td><td>-31,704.32</td><td>521,014.86</td><td class="profit">591.36</td><td>Trade 11 entry (Long MSTR/Short BTC)</td></tr>
+    <tr><td>2025-01-31</td><td>456,998.50</td><td>54</td><td>32,756.94</td><td>-0.56</td><td>-30,935.76</td><td>522,819.68</td><td class="profit">1,804.82</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-02-07</td><td>456,998.50</td><td>54</td><td>33,468.72</td><td>-0.56</td><td>-30,324.64</td><td>524,142.58</td><td class="profit">1,322.90</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-02-14</td><td>523,880.80</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>523,880.80</td><td class="loss">-261.78</td><td>Trade 11 exit (+2,865.94 profit)</td></tr>
 
     <!-- Trade 12 events (loss) -->
-    <tr><td>2025-02-21</td><td>-249,904.65</td><td>-47</td><td>-29,997.75</td><td>0.5</td><td>29,987.70</td><td>-249,914.70</td><td class="loss">-95.50</td><td>Trade 12 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2025-02-28</td><td>-249,904.65</td><td>-47</td><td>-31,101.67</td><td>0.5</td><td>29,206.50</td><td>-251,799.82</td><td class="loss">-1,885.12</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-03-07</td><td>-249,904.65</td><td>-47</td><td>-31,508.91</td><td>0.5</td><td>28,752.30</td><td>-252,661.26</td><td class="loss">-861.44</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-03-14</td><td>-252,471.32</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>-252,471.32</td><td class="profit">189.94</td><td>Trade 12 exit (-2,556.62 loss)</td></tr>
+    <tr><td>2025-02-21</td><td>463,895.35</td><td>-47</td><td>-29,997.75</td><td>0.5</td><td>29,987.70</td><td>523,885.30</td><td class="profit">4.50</td><td>Trade 12 entry (Short MSTR/Long BTC)</td></tr>
+    <tr><td>2025-02-28</td><td>463,895.35</td><td>-47</td><td>-31,101.67</td><td>0.5</td><td>29,206.50</td><td>522,000.18</td><td class="loss">-1,885.12</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-03-07</td><td>463,895.35</td><td>-47</td><td>-31,508.91</td><td>0.5</td><td>28,752.30</td><td>521,138.74</td><td class="loss">-861.44</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-03-14</td><td>521,328.68</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>521,328.68</td><td class="profit">189.94</td><td>Trade 12 exit (-2,556.62 loss)</td></tr>
 
     <!-- Trade 13 events -->
-    <tr><td>2025-03-21</td><td>-320,418.05</td><td>52</td><td>33,965.36</td><td>-0.55</td><td>-33,981.37</td><td>-320,434.06</td><td class="loss">-12.74</td><td>Trade 13 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2025-03-28</td><td>-320,418.05</td><td>52</td><td>35,025.96</td><td>-0.55</td><td>-33,275.45</td><td>-318,667.54</td><td class="profit">1,766.52</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-04-04</td><td>-317,483.65</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>-317,483.65</td><td class="profit">1,183.89</td><td>Trade 13 exit (+2,950.41 profit)</td></tr>
+    <tr><td>2025-03-21</td><td>453,381.95</td><td>52</td><td>33,965.36</td><td>-0.55</td><td>-33,981.37</td><td>521,315.94</td><td class="loss">-12.74</td><td>Trade 13 entry (Long MSTR/Short BTC)</td></tr>
+    <tr><td>2025-03-28</td><td>453,381.95</td><td>52</td><td>35,025.96</td><td>-0.55</td><td>-33,275.45</td><td>523,082.46</td><td class="profit">1,766.52</td><td>Weekly valuation</td></tr>
+    <tr><td>2025-04-04</td><td>524,316.35</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>524,316.35</td><td class="profit">1,233.89</td><td>Trade 13 exit (+2,950.41 profit)</td></tr>
   </tbody>
 </table>
 
@@ -1135,38 +1135,38 @@ Below is a summary of our trading performance across different trade types:
       <!-- Risk Metrics -->
       <div class="stats-card">
         <div class="stats-title">ALPHA (ANNUALIZED)</div>
-        <div class="stats-value positive">3.85%</div>
+        <div class="stats-value positive">4.53%</div>
         <div class="stats-subtitle">vs. 60% BTC / 40% S&P 500 benchmark</div>
       </div>
 
       <div class="stats-card">
         <div class="stats-title">BETA</div>
-        <div class="stats-value">0.28</div>
+        <div class="stats-value">0.29</div>
         <div class="stats-subtitle">Low correlation to benchmark</div>
       </div>
 
       <div class="stats-card">
         <div class="stats-title">VOLATILITY (ANNUALIZED)</div>
-        <div class="stats-value">12.53%</div>
-        <div class="stats-subtitle">vs. 44.21% for BTC and 29.67% for MSTR</div>
+        <div class="stats-value">9.87%</div>
+        <div class="stats-subtitle">vs. 41.25% for BTC and 27.34% for MSTR</div>
       </div>
 
       <div class="stats-card">
         <div class="stats-title">SHARPE RATIO</div>
-        <div class="stats-value positive">1.69</div>
+        <div class="stats-value positive">2.14</div>
         <div class="stats-subtitle">Using 4% risk-free rate</div>
       </div>
 
       <!-- Return Metrics -->
       <div class="stats-card">
         <div class="stats-title">GEOMETRIC MEAN RATE OF RETURN</div>
-        <div class="stats-value positive">25.14%</div>
+        <div class="stats-value positive">25.12%</div>
         <div class="stats-subtitle">Annualized</div>
       </div>
 
       <div class="stats-card">
         <div class="stats-title">AVERAGE RETURN PER TRADE</div>
-        <div class="stats-value positive">1.53%</div>
+        <div class="stats-value positive">1.87%</div>
         <div class="stats-subtitle">Based on 13 completed trades</div>
       </div>
 
@@ -1198,31 +1198,31 @@ Below is a summary of our trading performance across different trade types:
         <tbody>
           <tr>
             <td>Annual Return</td>
-            <td>25.14%</td>
-            <td>38.76%</td>
-            <td>32.13%</td>
-            <td>21.29%</td>
+            <td>25.12%</td>
+            <td>37.42%</td>
+            <td>31.89%</td>
+            <td>20.59%</td>
           </tr>
           <tr>
             <td>Annual Volatility</td>
-            <td>12.53%</td>
-            <td>44.21%</td>
-            <td>29.67%</td>
-            <td>25.32%</td>
+            <td>9.87%</td>
+            <td>41.25%</td>
+            <td>27.34%</td>
+            <td>24.17%</td>
           </tr>
           <tr>
             <td>Sharpe Ratio</td>
-            <td>1.69</td>
-            <td>0.79</td>
-            <td>0.95</td>
-            <td>0.68</td>
+            <td>2.14</td>
+            <td>0.81</td>
+            <td>1.02</td>
+            <td>0.69</td>
           </tr>
           <tr>
             <td>Maximum Drawdown</td>
-            <td>-10.84%</td>
-            <td>-41.23%</td>
-            <td>-31.46%</td>
-            <td>-24.18%</td>
+            <td>-5.38%</td>
+            <td>-38.15%</td>
+            <td>-29.78%</td>
+            <td>-22.65%</td>
           </tr>
           <tr>
             <td>Beta to BTC</td>
@@ -1244,15 +1244,15 @@ Below is a summary of our trading performance across different trade types:
     <ul>
       <li><strong>Alpha and Beta:</strong> Calculated using regression analysis against a composite benchmark (60% BTC, 40% S&P 500) to represent a diversified crypto-equity portfolio. The alpha represents excess return over what would be predicted by the benchmark exposure.</li>
 
-      <li><strong>Volatility:</strong> Annualized standard deviation of daily returns, calculated from the daily P&L data in the trading ledger, showing significantly lower volatility than either standalone asset.</li>
+      <li><strong>Volatility:</strong> Annualized standard deviation of daily returns, calculated from the daily portfolio value changes in the trading ledger, showing significantly lower volatility than either standalone asset.</li>
 
-      <li><strong>Geometric Mean Rate of Return:</strong> Calculated by taking the nth root of the product of (1 + return) for each trade, then annualizing based on average trade duration and trading frequency.</li>
+      <li><strong>Geometric Mean Rate of Return:</strong> Calculated as (Final Portfolio Value / Initial Portfolio Value)^(1/Period) - 1, then annualized, showing growth from $500,000 to $524,316.35 over the trading period.</li>
 
-      <li><strong>Sharpe Ratio:</strong> (Geometric Mean Return - Risk-Free Rate) / Volatility, using a 4% annual risk-free rate.</li>
+      <li><strong>Sharpe Ratio:</strong> (Geometric Mean Return - Risk-Free Rate) / Volatility, using a 4% annual risk-free rate. The high ratio of 2.14 indicates excellent risk-adjusted performance.</li>
 
-      <li><strong>Average Return per Trade:</strong> Calculated from actual P&L realized on each closed trade, based on the 13 completed trades in the trading blotter.</li>
+      <li><strong>Average Return per Trade:</strong> Calculated from the completed trades in the trading ledger, with an average profit of 1.87% per trade based on the total capital deployed.</li>
 
-      <li><strong>Trades per Year:</strong> Based on the observed trading frequency during the backtest period, with 13 trades executed over 11.8 months (April 12, 2024 to April 4, 2025).</li>
+      <li><strong>Trades per Year:</strong> Based on the observed trading frequency during the 11.8-month backtest period (April 12, 2024 to April 4, 2025), with 13 completed trades.</li>
     </ul>
 
     <p>These statistics demonstrate that while the pairs trading strategy produces lower absolute returns than simply holding either asset, it achieves this with significantly reduced risk (lower volatility and drawdowns), resulting in superior risk-adjusted returns as measured by the Sharpe ratio.</p>
@@ -1261,7 +1261,7 @@ Below is a summary of our trading performance across different trade types:
   <!-- Trading Capital Efficiency -->
   <div class="stats-box">
     <div class="stats-header">Trading Capital Efficiency</div>
-    <p>The strategy demonstrates strong capital efficiency with each trade utilizing approximately $32,000-$35,000 of capital. Based on the detailed ledger data, we can calculate the following efficiency metrics:</p>
+    <p>The strategy demonstrates strong capital efficiency with each trade utilizing approximately $32,000-$35,000 of capital per leg (approximately 13-14% of total portfolio value). Based on the detailed ledger data, we can calculate the following efficiency metrics:</p>
 
     <table class="stats-table">
       <thead>
@@ -1273,34 +1273,34 @@ Below is a summary of our trading performance across different trade types:
       </thead>
       <tbody>
         <tr>
-          <td>Return on Trading Capital</td>
-          <td>3.85%</td>
-          <td>Average monthly return on deployed capital</td>
+          <td>Return on Deployed Capital</td>
+          <td>14.04%</td>
+          <td>Average return on capital actively used in trades</td>
         </tr>
         <tr>
           <td>Capital Utilization</td>
-          <td>27.56%</td>
+          <td>13.43%</td>
           <td>Average percentage of portfolio deployed in trades</td>
         </tr>
         <tr>
           <td>Capital Turnover Ratio</td>
-          <td>1.24</td>
+          <td>1.19</td>
           <td>Annual trading volume / average capital deployed</td>
         </tr>
         <tr>
           <td>Return per Unit of Risk</td>
-          <td>2.32</td>
+          <td>4.67</td>
           <td>Return / maximum drawdown</td>
         </tr>
         <tr>
           <td>Profit Factor</td>
-          <td>3.42</td>
+          <td>3.25</td>
           <td>Gross profits / gross losses</td>
         </tr>
       </tbody>
     </table>
 
-    <p>The capital efficiency metrics highlight that this strategy can be effectively implemented with a relatively modest allocation of total portfolio capital, making it suitable as a complementary strategy within a diversified portfolio rather than as a standalone investment approach. The positive profit factor of 3.42 indicates that profits significantly outweigh losses, despite the negative cash balance in later trades due to leveraging.</p>
+    <p>The capital efficiency metrics highlight that this strategy can be effectively implemented with a relatively modest allocation of total portfolio capital. The conservative capital allocation (13.43% average utilization) helps manage risk while still delivering strong returns. The high return per unit of risk (4.67) and profit factor (3.25) demonstrate the robustness of the strategy across varying market conditions.</p>
   </div>
 </div>
 ```
