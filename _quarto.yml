@@ -3,7 +3,7 @@ project:
   output-dir: docs
 
 website:
-  title: "YsTrades"
+  title: "PairFlow"
   navbar:
     left:
       - href: index.qmd
