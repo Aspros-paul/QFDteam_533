@@ -102,7 +102,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from statsmodels.regression.linear_model import OLS
+from statsmodels.tsa.stattools import adfuller
 import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import datetime
 
 # Load real data from CSV
@@ -120,245 +123,268 @@ data['Z_Score'] = (data['Ratio'] - data['Ratio_MA']) / data['Ratio_STD']
 # Drop NaN values after calculations
 data = data.dropna()
 
-# Define thresholds
+# Run regression analysis for beta calculation
+X = sm.add_constant(returns['BTC'])
+model = OLS(returns['MSTR'], X).fit()
+alpha = model.params[0]
+beta = model.params[1]
+r_squared = model.rsquared
+
+# Run ADF test on the ratio to check for stationarity
+adf_result = adfuller(data['Ratio'].dropna())
+adf_pvalue = adf_result[1]
+
+# Define thresholds for different strategies
 thresholds = [0.5, 1.0, 1.5, 2.0, 2.5]
 
-# Function to run simplified backtests
-def run_simple_backtest(data, threshold, risk_free_rate=0.04):
-    """Run a simplified backtest for a specific threshold"""
-    # Use previous day's Z-score for decision making
-    z_score = data['Z_Score'].shift(1).dropna()
+# Create a real backtesting function
+def backtest_pairs_strategy(data, threshold, risk_free_rate=0.04):
+    """Run a real backtest for pairs trading with a specific threshold"""
 
-    # Create position signals
-    position = pd.Series(0, index=z_score.index)
-    position[z_score > threshold] = -1  # Short MSTR, Long BTC
-    position[z_score < -threshold] = 1  # Long MSTR, Short BTC
+    # Make a copy of the dataframe to avoid modifying the original
+    df = data.copy()
 
-    # Align data
-    aligned_returns = returns.loc[z_score.index]
+    # Create position signals based on Z-score
+    # 1 = Long MSTR, Short BTC
+    # -1 = Short MSTR, Long BTC
+    # 0 = No position
+    df['Signal'] = 0
+    df.loc[df['Z_Score'] < -threshold, 'Signal'] = 1  # Long MSTR, Short BTC
+    df.loc[df['Z_Score'] > threshold, 'Signal'] = -1  # Short MSTR, Long BTC
 
-    # Calculate strategy returns
-    strategy_returns = position * (aligned_returns['MSTR'] - aligned_returns['BTC'])
+    # To avoid lookahead bias, shift the signal by 1 day (use yesterday's signal for today's position)
+    df['Position'] = df['Signal'].shift(1)
+    df = df.dropna()  # Drop rows with NaN positions
+
+    # Track trade entries and exits
+    df['Entry'] = df['Position'] != df['Position'].shift(1)
+    df['Exit'] = df['Position'].shift(1) != 0
+    df.loc[df['Entry'] & df['Exit'], 'Exit'] = False  # If both entry and exit, it's an entry
+
+    # Calculate position values (assume equal dollar amounts in both legs)
+    df['MSTR_Position'] = df['Position'] * 1  # +1 for long, -1 for short
+    df['BTC_Position'] = -df['Position'] * 1  # Opposite of MSTR position
+
+    # Calculate daily returns for the strategy
+    df['MSTR_Return'] = returns['MSTR'].loc[df.index] * df['MSTR_Position']
+    df['BTC_Return'] = returns['BTC'].loc[df.index] * df['BTC_Position']
+    df['Strategy_Return'] = df['MSTR_Return'] + df['BTC_Return']
 
     # Calculate cumulative returns
-    cumulative_returns = (1 + strategy_returns).cumprod()
+    df['Cumulative_Return'] = (1 + df['Strategy_Return']).cumprod()
+
+    # Calculate drawdown
+    df['Peak'] = df['Cumulative_Return'].cummax()
+    df['Drawdown'] = (df['Cumulative_Return'] / df['Peak'] - 1) * 100  # in percentage
+
+    # Calculate trade details
+    trades = []
+    current_trade = None
+
+    for date, row in df.iterrows():
+        if row['Entry'] and row['Position'] != 0:
+            # Start a new trade
+            current_trade = {
+                'Entry_Date': date,
+                'Entry_Type': 'Long MSTR/Short BTC' if row['Position'] > 0 else 'Short MSTR/Long BTC',
+                'Entry_MSTR_Price': row['MSTR'],
+                'Entry_BTC_Price': row['BTC'],
+                'Entry_Ratio': row['Ratio'],
+                'Entry_Z_Score': row['Z_Score'],
+                'Position': row['Position']
+            }
+        elif row['Exit'] and current_trade is not None:
+            # Close an existing trade
+            current_trade['Exit_Date'] = date
+            current_trade['Exit_MSTR_Price'] = row['MSTR']
+            current_trade['Exit_BTC_Price'] = row['BTC']
+            current_trade['Exit_Ratio'] = row['Ratio']
+            current_trade['Exit_Z_Score'] = row['Z_Score']
+
+            # Calculate trade returns
+            if current_trade['Position'] > 0:  # Long MSTR/Short BTC
+                mstr_return = (row['MSTR'] / current_trade['Entry_MSTR_Price'] - 1)
+                btc_return = (current_trade['Entry_BTC_Price'] / row['BTC'] - 1)
+            else:  # Short MSTR/Long BTC
+                mstr_return = (current_trade['Entry_MSTR_Price'] / row['MSTR'] - 1)
+                btc_return = (row['BTC'] / current_trade['Entry_BTC_Price'] - 1)
+
+            current_trade['MSTR_Return'] = mstr_return
+            current_trade['BTC_Return'] = btc_return
+            current_trade['Total_Return'] = mstr_return + btc_return
+            current_trade['Duration'] = (date - current_trade['Entry_Date']).days
+
+            trades.append(current_trade)
+            current_trade = None
 
     # Calculate performance metrics
-    annual_return = cumulative_returns.iloc[-1] ** (252 / len(strategy_returns)) - 1
-    annual_volatility = strategy_returns.std() * np.sqrt(252)
+    total_days = len(df)
+    position_days = (df['Position'] != 0).sum()
+    position_days_ratio = position_days / total_days
+
+    win_days = (df['Strategy_Return'] > 0).sum()
+    win_ratio = win_days / total_days
+
+    trade_count = len(trades)
+    if trade_count > 0:
+        winning_trades = sum(1 for trade in trades if trade['Total_Return'] > 0)
+        win_trade_ratio = winning_trades / trade_count
+        avg_trade_return = sum(trade['Total_Return'] for trade in trades) / trade_count
+        avg_trade_duration = sum(trade['Duration'] for trade in trades) / trade_count
+    else:
+        winning_trades = 0
+        win_trade_ratio = 0
+        avg_trade_return = 0
+        avg_trade_duration = 0
+
+    # Calculate annualized metrics
+    annual_factor = 252 / total_days
+
+    if len(df) > 0:
+        annual_return = df['Cumulative_Return'].iloc[-1] ** annual_factor - 1
+        annual_volatility = df['Strategy_Return'].std() * np.sqrt(252)
+        sharpe_ratio = (annual_return - risk_free_rate) / annual_volatility if annual_volatility > 0 else 0
+        max_drawdown = df['Drawdown'].min()
+    else:
+        annual_return = 0
+        annual_volatility = 0
+        sharpe_ratio = 0
+        max_drawdown = 0
+
+    return {
+        'Data': df,
+        'Trades': trades,
+        'Annual_Return': annual_return,
+        'Annual_Volatility': annual_volatility,
+        'Sharpe_Ratio': sharpe_ratio,
+        'Max_Drawdown': max_drawdown,
+        'Trade_Count': trade_count,
+        'Win_Trade_Ratio': win_trade_ratio,
+        'Avg_Trade_Return': avg_trade_return,
+        'Avg_Trade_Duration': avg_trade_duration,
+        'Position_Days_Ratio': position_days_ratio,
+        'Win_Ratio': win_ratio
+    }
+
+# Run backtests for different Z-score thresholds
+backtest_results = {}
+for threshold in thresholds:
+    backtest_results[f'Pairs_Z{threshold}'] = backtest_pairs_strategy(data, threshold)
+
+# Calculate buy-and-hold returns for BTC and MSTR
+# Align with backtest date range
+first_date = list(backtest_results.values())[0]['Data'].index[0]
+last_date = list(backtest_results.values())[0]['Data'].index[-1]
+
+btc_aligned = data.loc[first_date:last_date, 'BTC']
+mstr_aligned = data.loc[first_date:last_date, 'MSTR']
+
+btc_return = (btc_aligned[-1] / btc_aligned[0]) - 1
+mstr_return = (mstr_aligned[-1] / mstr_aligned[0]) - 1
+
+# Calculate daily buy-and-hold returns
+btc_daily_returns = returns.loc[first_date:last_date, 'BTC']
+mstr_daily_returns = returns.loc[first_date:last_date, 'MSTR']
+
+btc_cum_returns = (1 + btc_daily_returns).cumprod()
+mstr_cum_returns = (1 + mstr_daily_returns).cumprod()
+
+# Calculate buy-and-hold performance metrics
+def calculate_buy_hold_metrics(returns, cum_returns, risk_free_rate=0.04):
+    annual_return = cum_returns.iloc[-1] ** (252 / len(returns)) - 1
+    annual_volatility = returns.std() * np.sqrt(252)
     sharpe_ratio = (annual_return - risk_free_rate) / annual_volatility if annual_volatility > 0 else 0
 
     # Calculate drawdown
-    running_max = cumulative_returns.cummax()
-    drawdown = (cumulative_returns / running_max - 1)
+    running_max = cum_returns.cummax()
+    drawdown = (cum_returns / running_max - 1) * 100  # in percentage
     max_drawdown = drawdown.min()
 
-    # Count trades
-    trades = position.diff().fillna(0) != 0
-    trade_count = trades.sum()
-
-    # Calculate win ratio
-    win_days = (strategy_returns > 0).sum()
-    win_ratio = win_days / len(strategy_returns)
-
-    # Calculate position days ratio
-    position_days = (position != 0).sum()
-    position_ratio = position_days / len(position)
-
     return {
-        'Returns': strategy_returns,
-        'Cumulative': cumulative_returns,
-        'Annual Return': annual_return,
-        'Annual Volatility': annual_volatility,
-        'Sharpe Ratio': sharpe_ratio,
-        'Max Drawdown': max_drawdown,
-        'Trade Count': trade_count,
-        'Win Ratio': win_ratio,
-        'Position Days Ratio': position_ratio
+        'Returns': returns,
+        'Cumulative': cum_returns,
+        'Annual_Return': annual_return,
+        'Annual_Volatility': annual_volatility,
+        'Sharpe_Ratio': sharpe_ratio,
+        'Max_Drawdown': max_drawdown
     }
 
-# Run backtests for different thresholds
-backtest_results = {}
-for threshold in thresholds:
-    backtest_results[f'Pairs_Z{threshold}'] = run_simple_backtest(data, threshold)
+# Add buy-and-hold strategies to backtest results
+backtest_results['Hold_BTC'] = calculate_buy_hold_metrics(btc_daily_returns, btc_cum_returns)
+backtest_results['Hold_MSTR'] = calculate_buy_hold_metrics(mstr_daily_returns, mstr_cum_returns)
 
-# Run buy and hold strategies
-btc_returns = returns['BTC'].loc[data.index[1:]]
-mstr_returns = returns['MSTR'].loc[data.index[1:]]
-
-btc_cumulative = (1 + btc_returns).cumprod()
-mstr_cumulative = (1 + mstr_returns).cumprod()
-
-# Add to backtest results
-backtest_results['Hold_BTC'] = {
-    'Returns': btc_returns,
-    'Cumulative': btc_cumulative,
-    'Annual Return': 0.470361,  # From actual results
-    'Annual Volatility': 0.525767,  # From actual results
-    'Sharpe Ratio': 0.818539,  # From actual results
-    'Max Drawdown': -0.281130  # From actual results
-}
-
-backtest_results['Hold_MSTR'] = {
-    'Returns': mstr_returns,
-    'Cumulative': mstr_cumulative,
-    'Annual Return': 1.595177,  # From actual results
-    'Annual Volatility': 1.016850,  # From actual results
-    'Sharpe Ratio': 1.529407,  # From actual results
-    'Max Drawdown': -0.497816  # From actual results
-}
-
-# Create performance summary dataframe (using actual results)
-performance_df = pd.DataFrame({
-    'Pairs_Z0.5': {
-        'Annual Return': 0.216169,
-        'Annual Volatility': 0.680870,
-        'Sharpe Ratio': 0.258742,
-        'Max Drawdown': -0.537857,
-        'Trade Count': 64.0,
-        'Position Days Ratio': 0.695652,
-        'Win Ratio': 0.360870
-    },
-    'Pairs_Z1.0': {
-        'Annual Return': 0.482885,
-        'Annual Volatility': 0.570563,
-        'Sharpe Ratio': 0.776224,
-        'Max Drawdown': -0.426954,
-        'Trade Count': 51.0,
-        'Position Days Ratio': 0.439130,
-        'Win Ratio': 0.221739
-    },
-    'Pairs_Z1.5': {
-        'Annual Return': 0.571179,
-        'Annual Volatility': 0.483172,
-        'Sharpe Ratio': 1.099357,
-        'Max Drawdown': -0.318907,
-        'Trade Count': 44.0,
-        'Position Days Ratio': 0.256522,
-        'Win Ratio': 0.121739
-    },
-    'Pairs_Z2.0': {
-        'Annual Return': 0.663850,
-        'Annual Volatility': 0.424579,
-        'Sharpe Ratio': 1.469336,
-        'Max Drawdown': -0.180093,
-        'Trade Count': 34.0,
-        'Position Days Ratio': 0.121739,
-        'Win Ratio': 0.060870
-    },
-    'Pairs_Z2.5': {
-        'Annual Return': 0.272222,
-        'Annual Volatility': 0.281886,
-        'Sharpe Ratio': 0.823814,
-        'Max Drawdown': -0.115443,
-        'Trade Count': 10.0,
-        'Position Days Ratio': 0.034783,
-        'Win Ratio': 0.021739
-    },
-    'Hold_MSTR': {
-        'Annual Return': 1.595177,
-        'Annual Volatility': 1.016850,
-        'Sharpe Ratio': 1.529407,
-        'Max Drawdown': -0.497816
-    },
-    'Hold_BTC': {
-        'Annual Return': 0.470361,
-        'Annual Volatility': 0.525767,
-        'Sharpe Ratio': 0.818539,
-        'Max Drawdown': -0.281130
+# Prepare performance summary DataFrame
+performance_data = {}
+for strategy, results in backtest_results.items():
+    performance_data[strategy] = {
+        'Annual_Return': results['Annual_Return'] if strategy.startswith('Pairs') else results['Annual_Return'],
+        'Annual_Volatility': results['Annual_Volatility'] if strategy.startswith('Pairs') else results['Annual_Volatility'],
+        'Sharpe_Ratio': results['Sharpe_Ratio'] if strategy.startswith('Pairs') else results['Sharpe_Ratio'],
+        'Max_Drawdown': results['Max_Drawdown'] if strategy.startswith('Pairs') else results['Max_Drawdown']
     }
-}).T
+
+    if strategy.startswith('Pairs'):
+        performance_data[strategy]['Trade_Count'] = results.get('Trade_Count', np.nan)
+        performance_data[strategy]['Position_Days_Ratio'] = results.get('Position_Days_Ratio', np.nan)
+        performance_data[strategy]['Win_Ratio'] = results.get('Win_Ratio', np.nan)
+
+# Convert to DataFrame
+performance_df = pd.DataFrame.from_dict(performance_data, orient='index')
+
+# Rename columns for display
+performance_df = performance_df.rename(columns={
+    'Annual_Return': 'Annual Return',
+    'Annual_Volatility': 'Annual Volatility',
+    'Sharpe_Ratio': 'Sharpe Ratio',
+    'Max_Drawdown': 'Max Drawdown',
+    'Trade_Count': 'Trade Count',
+    'Position_Days_Ratio': 'Position Days Ratio',
+    'Win_Ratio': 'Win Ratio'
+})
 
 # Format for display
 display_df = performance_df.copy()
 for col in ['Annual Return', 'Annual Volatility', 'Max Drawdown']:
-    display_df[col] = display_df[col].map('{:.2%}'.format)
-display_df['Sharpe Ratio'] = display_df['Sharpe Ratio'].map('{:.2f}'.format)
+    if col in display_df.columns:
+        display_df[col] = display_df[col].map('{:.2%}'.format)
+if 'Sharpe Ratio' in display_df.columns:
+    display_df['Sharpe Ratio'] = display_df['Sharpe Ratio'].map('{:.2f}'.format)
 if 'Win Ratio' in display_df.columns:
-    display_df['Win Ratio'] = display_df['Win Ratio'].map('{:.2%}'.format)
+    display_df['Win Ratio'] = display_df['Win Ratio'].fillna('').map(lambda x: '{:.2%}'.format(x) if x != '' else '')
 if 'Position Days Ratio' in display_df.columns:
-    display_df['Position Days Ratio'] = display_df['Position Days Ratio'].map('{:.2%}'.format)
+    display_df['Position Days Ratio'] = display_df['Position Days Ratio'].fillna('').map(lambda x: '{:.2%}'.format(x) if x != '' else '')
 if 'Trade Count' in display_df.columns:
-    display_df['Trade Count'] = display_df['Trade Count'].map('{:.0f}'.format)
+    display_df['Trade Count'] = display_df['Trade Count'].fillna('').map(lambda x: '{:.0f}'.format(x) if x != '' else '')
 
-# Generate sample trading ledger with realistic data
-def generate_sample_trades(data, threshold=2.0):
-    trades = []
+# Extract real trades for displaying in the trading ledger
+optimal_threshold = 2.0
+optimal_strategy = f'Pairs_Z{optimal_threshold}'
+optimal_trades = backtest_results[optimal_strategy]['Trades']
 
-    # Create sample trades with different entry/exit patterns
-    trade_dates = [(data.index[20], data.index[35]),
-                   (data.index[50], data.index[65]),
-                   (data.index[80], data.index[95]),
-                   (data.index[110], data.index[125]),
-                   (data.index[140], data.index[155]),
-                   (data.index[170], data.index[185]),
-                   (data.index[200], data.index[215])]
+# Calculate trade metrics for all strategies
+trade_metrics = {}
+for threshold in thresholds:
+    strategy = f'Pairs_Z{threshold}'
+    trades = backtest_results[strategy]['Trades']
 
-    for i, (entry_date, exit_date) in enumerate(trade_dates):
-        trade_id = i + 1
+    if trades:
+        winning_trades = sum(1 for trade in trades if trade['Total_Return'] > 0)
+        avg_return = sum(trade['Total_Return'] for trade in trades) / len(trades)
+        avg_duration = sum(trade['Duration'] for trade in trades) / len(trades)
 
-        # Alternate between long and short
-        if i % 2 == 0:
-            entry_type = 'Long MSTR/Short BTC'
-            z_score = -2.2  # Below threshold
-            exit_type = 'Mean Reversion'
-            exit_z_score = -0.1
-            pnl = np.random.uniform(0.5, 3.5)  # Positive PnL for successful trades
-        else:
-            entry_type = 'Short MSTR/Long BTC'
-            z_score = 2.2  # Above threshold
-            exit_type = 'Mean Reversion'
-            exit_z_score = 0.1
-            pnl = np.random.uniform(0.5, 3.5)  # Positive PnL for successful trades
-
-        # Add some losses (about 30%)
-        if i % 3 == 0:
-            pnl = -np.random.uniform(0.5, 2.0)
-            exit_type = 'Stop Loss'
-
-        entry_ratio = data.loc[entry_date, 'Ratio']
-        exit_ratio = data.loc[exit_date, 'Ratio']
-        duration = (exit_date - entry_date).days
-
-        trades.append({
-            'Trade ID': trade_id,
-            'Entry Date': entry_date.strftime('%Y-%m-%d'),
-            'Entry Type': entry_type,
-            'Entry Z-Score': f"{z_score:.2f}",
-            'Entry Ratio': f"{entry_ratio:.6f}",
-            'MSTR Entry': f"${data.loc[entry_date, 'MSTR']:.2f}",
-            'BTC Entry': f"${data.loc[entry_date, 'BTC']:.2f}",
-            'Exit Date': exit_date.strftime('%Y-%m-%d'),
-            'Exit Type': exit_type,
-            'Exit Z-Score': f"{exit_z_score:.2f}",
-            'Exit Ratio': f"{exit_ratio:.6f}",
-            'MSTR Exit': f"${data.loc[exit_date, 'MSTR']:.2f}",
-            'BTC Exit': f"${data.loc[exit_date, 'BTC']:.2f}",
-            'PnL (%)': f"{pnl:.2f}",
-            'Duration (Days)': duration
-        })
-
-    return pd.DataFrame(trades)
-
-# Generate sample trades
-trades_df = generate_sample_trades(data)
-
-# Prepare colored trades data for display without using Styler
-trade_table_data = []
-for _, row in trades_df.iterrows():
-    pnl_value = float(row['PnL (%)'])
-    pnl_color = 'green' if pnl_value > 0 else 'red'
-
-    trade_table_data.append({
-        'Trade ID': row['Trade ID'],
-        'Entry Date': row['Entry Date'],
-        'Entry Type': row['Entry Type'],
-        'Exit Date': row['Exit Date'],
-        'Exit Type': row['Exit Type'],
-        'PnL (%)': row['PnL (%)'],
-        'PnL_Color': pnl_color,
-        'Duration (Days)': row['Duration (Days)']
-    })
+        trade_metrics[strategy] = {
+            'Count': len(trades),
+            'Win Rate': winning_trades / len(trades),
+            'Avg Return': avg_return,
+            'Avg Duration': avg_duration
+        }
+    else:
+        trade_metrics[strategy] = {
+            'Count': 0,
+            'Win Rate': 0,
+            'Avg Return': 0,
+            'Avg Duration': 0
+        }
 ```
 
 # MSTR-BTC Pairs Trading Strategy
@@ -375,44 +401,6 @@ This trading strategy exploits the statistical relationship between MicroStrateg
 - **Time Frame**: Daily trading (based on daily price data)
 - **Market Approach**: Market-neutral strategy that can work in various market conditions
 
-## Single Trade Walkthrough
-
-### Entry Signal
-
-The strategy enters a position when the Z-score of the MSTR/BTC price ratio exceeds a predetermined threshold (optimally 2.0 based on backtests):
-
-1. **Long MSTR, Short BTC**: When Z-score < -2.0
-   - This indicates MSTR is undervalued relative to BTC
-   - We buy MSTR and sell BTC in equal dollar amounts
-
-2. **Short MSTR, Long BTC**: When Z-score > 2.0
-   - This indicates MSTR is overvalued relative to BTC
-   - We sell MSTR and buy BTC in equal dollar amounts
-
-### Exit Signal
-
-The strategy exits a position when the Z-score returns to the mean (Z-score approaches 0):
-
-1. **Close Long MSTR, Short BTC Position**: When Z-score rises to 0 after being below -2.0
-2. **Close Short MSTR, Long BTC Position**: When Z-score falls to 0 after being above 2.0
-
-Additionally, we implement time-based exits to avoid prolonged exposure:
-
-- Maximum holding period: 20 trading days
-- Close position if Z-score does not revert within this period
-
-### Stop Loss
-
-Risk management is implemented through the following stop loss rules:
-
-1. **Z-score Stop Loss**: Exit if Z-score moves further beyond entry threshold by 1.0
-   - For long MSTR/short BTC positions: exit if Z-score falls below -3.0
-   - For short MSTR/long BTC positions: exit if Z-score rises above 3.0
-
-2. **Dollar-Based Stop Loss**: Exit if position loses more than 2% of account value
-
-3. **Volatility-Based Stop Loss**: Exit if either asset experiences abnormal volatility (>3x average)
-
 ## Data Analysis
 
 ### MSTR and BTC Price Relationship
@@ -420,9 +408,6 @@ Risk management is implemented through the following stop loss rules:
 ```{python}
 #| echo: false
 #| warning: false
-
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # Create a subplot with two Y-axes
 fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -468,10 +453,7 @@ The relationship between MSTR and BTC prices forms the foundation of our pairs t
 #| warning: false
 #| message: false
 
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-
-# Define Z-Score threshold lines (for visual only, not for backtest)
+# Define Z-Score threshold lines
 thresholds_zlines = [-3, -2, -1, 0, 1, 2, 3]
 
 # Create subplots with secondary y-axis
@@ -570,11 +552,15 @@ The key metrics that validate our pairs trading approach:
 #| warning: false
 #| message: false
 
-# Create table of metrics using actual values provided by the user
+# Create table of metrics using actual calculated values
 metrics = pd.DataFrame({
     'Metric': ['Correlation Coefficient', 'Beta (MSTR to BTC)',
                'Average Price Ratio', 'Price Ratio StdDev', 'ADF Test p-value'],
-    'Value': ['0.7160', '1.3948', '0.0030', '0.0007', '0.5789 (Non-stationary)']
+    'Value': [f'{returns["MSTR"].corr(returns["BTC"]):.4f}',
+              f'{beta:.4f}',
+              f'{data["Ratio"].mean():.4f}',
+              f'{data["Ratio"].std():.4f}',
+              f'{adf_pvalue:.4f} ({"Stationary" if adf_pvalue < 0.05 else "Non-stationary"})']
 })
 
 metrics
@@ -601,13 +587,15 @@ The cumulative returns of our strategy compared to buy-and-hold approaches:
 #| echo: false
 #| warning: false
 
+# Get the optimal strategy's data
+optimal_strategy = f'Pairs_Z{2.0}'
+optimal_data = backtest_results[optimal_strategy]['Data']
+
 # Create cumulative returns data for plotting
 cum_returns_data = pd.DataFrame()
 
-# Add pairs trading strategies
-for threshold in thresholds:
-    strategy = f'Pairs_Z{threshold}'
-    cum_returns_data[strategy] = backtest_results[strategy]['Cumulative']
+# Add the optimal pairs trading strategy
+cum_returns_data[optimal_strategy] = optimal_data['Cumulative_Return']
 
 # Add buy-and-hold strategies
 cum_returns_data['Hold_MSTR'] = backtest_results['Hold_MSTR']['Cumulative']
@@ -618,11 +606,11 @@ cum_returns_data = cum_returns_data.reset_index()
 cum_returns_data = cum_returns_data.rename(columns={'index': 'date'})
 
 # Plot with plotly
-fig = px.line(cum_returns_data, x='date', y=['Pairs_Z2.0', 'Hold_MSTR', 'Hold_BTC'],
+fig = px.line(cum_returns_data, x='date', y=[optimal_strategy, 'Hold_MSTR', 'Hold_BTC'],
               title='Cumulative Returns: Pairs Trading vs Buy-and-Hold',
               labels={'value': 'Cumulative Return (Initial = 1)', 'variable': 'Strategy'},
               color_discrete_map={
-                  'Pairs_Z2.0': 'green',
+                  optimal_strategy: 'green',
                   'Hold_MSTR': 'blue',
                   'Hold_BTC': 'red'
               })
@@ -646,7 +634,7 @@ fig.show()
 #| echo: false
 #| warning: false
 
-# Create simple risk-return table
+# Create risk-return table from actual backtest results
 risk_return_table = performance_df[['Annual Return', 'Annual Volatility', 'Sharpe Ratio']].copy()
 
 # Format for display
@@ -664,26 +652,43 @@ risk_return_table
 #| echo: false
 #| warning: false
 
-# Calculate drawdown series
-def calculate_drawdown_series(equity_curve):
-    running_max = equity_curve.cummax()
-    drawdown = (equity_curve / running_max - 1) * 100  # Convert to percentage
-    return drawdown
+# Use the optimal strategy
+optimal_strategy = f'Pairs_Z{2.0}'
 
-# Calculate drawdowns for key strategies
+# Calculate drawdown for pairs strategy
+pairs_drawdown = backtest_results[optimal_strategy]['Data']['Drawdown']
+
+# Calculate drawdowns for buy and hold strategies
+mstr_returns = backtest_results['Hold_MSTR']['Returns']
+btc_returns = backtest_results['Hold_BTC']['Returns']
+
+mstr_cum_returns = backtest_results['Hold_MSTR']['Cumulative']
+btc_cum_returns = backtest_results['Hold_BTC']['Cumulative']
+
+# Calculate drawdown series for both assets
+mstr_running_max = mstr_cum_returns.cummax()
+mstr_drawdown = (mstr_cum_returns / mstr_running_max - 1) * 100
+
+btc_running_max = btc_cum_returns.cummax()
+btc_drawdown = (btc_cum_returns / btc_running_max - 1) * 100
+
+# Create DataFrame for plotting
 drawdown_data = pd.DataFrame({
-    'Date': backtest_results['Pairs_Z2.0']['Cumulative'].index,
-    'Pairs_Z2.0': calculate_drawdown_series(backtest_results['Pairs_Z2.0']['Cumulative']),
-    'Hold_MSTR': calculate_drawdown_series(backtest_results['Hold_MSTR']['Cumulative']),
-    'Hold_BTC': calculate_drawdown_series(backtest_results['Hold_BTC']['Cumulative'])
+    'Date': pairs_drawdown.index,
+    optimal_strategy: pairs_drawdown,
+    'Hold_MSTR': mstr_drawdown,
+    'Hold_BTC': btc_drawdown
 })
 
+# Reset index for plotting
+drawdown_data = drawdown_data.reset_index(drop=True)
+
 # Create drawdown chart
-fig = px.line(drawdown_data, x='Date', y=['Pairs_Z2.0', 'Hold_MSTR', 'Hold_BTC'],
+fig = px.line(drawdown_data, x='Date', y=[optimal_strategy, 'Hold_MSTR', 'Hold_BTC'],
              title='Drawdown Comparison',
              labels={'value': 'Drawdown (%)', 'variable': 'Strategy'},
              color_discrete_map={
-                 'Pairs_Z2.0': 'green',
+                 optimal_strategy: 'green',
                  'Hold_MSTR': 'blue',
                  'Hold_BTC': 'red'
              })
@@ -704,623 +709,128 @@ fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
 fig.show()
 ```
 
-## Trading Blotter with Search
+## Trading Analysis
 
-Our blotter provides a comprehensive view of all trades executed by the strategy. Use the search box below to filter trades by date or any other characteristic:
+### Trade Performance by Z-Score Threshold
 
-```{=html}
-<style>
-#searchInput, #ledgerSearch {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 15px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
-}
+```{python}
+#| echo: false
+#| warning: false
 
-#tradesTable, #ledgerTable {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
+# Create DataFrame for trade metrics
+trade_metrics_df = pd.DataFrame(trade_metrics).T
 
-#tradesTable th, #ledgerTable th {
-  background-color: #4CAF50;
-  color: white;
-  padding: 10px;
-  text-align: left;
-  border: 1px solid #ddd;
-}
+# Format for display
+trade_metrics_df['Win Rate'] = trade_metrics_df['Win Rate'].map('{:.2%}'.format)
+trade_metrics_df['Avg Return'] = trade_metrics_df['Avg Return'].map('{:.2%}'.format)
+trade_metrics_df['Avg Duration'] = trade_metrics_df['Avg Duration'].map('{:.1f} days'.format)
 
-#tradesTable td, #ledgerTable td {
-  padding: 8px;
-  border: 1px solid #ddd;
-}
-
-#tradesTable tr:nth-child(even), #ledgerTable tr:nth-child(even) {
-  background-color: #f2f2f2;
-}
-
-#tradesTable tr:hover, #ledgerTable tr:hover {
-  background-color: #ddd;
-}
-
-.profit {
-  color: green;
-  font-weight: bold;
-}
-
-.loss {
-  color: red;
-  font-weight: bold;
-}
-
-.section-title {
-  margin-top: 30px;
-  margin-bottom: 15px;
-  font-size: 20px;
-  font-weight: bold;
-}
-
-.buy {
-  color: green;
-  font-weight: bold;
-}
-
-.sell {
-  color: red;
-  font-weight: bold;
-}
-</style>
-
-<input type="text" id="searchInput" placeholder="Search for date, asset, action...">
-
-<table id="tradesTable">
-  <thead>
-    <tr>
-      <th>Trade Date</th>
-      <th>Asset</th>
-      <th>Action</th>
-      <th>Quantity</th>
-      <th>Price ($)</th>
-      <th>Trade Value ($)</th>
-      <th>Execution Time</th>
-      <th>Exchange</th>
-      <th>Trade ID</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td>2024-04-12</td><td>MSTR</td><td class="buy">BUY</td><td>50</td><td>683.42</td><td>34,171.00</td><td>09:35:22</td><td>NASDAQ</td><td>1</td></tr>
-    <tr><td>2024-04-12</td><td>BTC</td><td class="sell">SELL</td><td>0.56</td><td>61,052.86</td><td>34,189.60</td><td>09:36:05</td><td>Coinbase</td><td>1</td></tr>
-    <tr><td>2024-05-03</td><td>MSTR</td><td class="sell">SELL</td><td>50</td><td>742.18</td><td>37,109.00</td><td>10:12:45</td><td>NASDAQ</td><td>1</td></tr>
-    <tr><td>2024-05-03</td><td>BTC</td><td class="buy">BUY</td><td>0.56</td><td>57,623.57</td><td>32,269.20</td><td>10:14:12</td><td>Coinbase</td><td>1</td></tr>
-
-    <tr><td>2024-05-10</td><td>MSTR</td><td class="sell">SELL</td><td>45</td><td>759.84</td><td>34,192.80</td><td>09:42:38</td><td>NASDAQ</td><td>2</td></tr>
-    <tr><td>2024-05-10</td><td>BTC</td><td class="buy">BUY</td><td>0.52</td><td>65,732.12</td><td>34,180.70</td><td>09:43:24</td><td>Coinbase</td><td>2</td></tr>
-    <tr><td>2024-05-31</td><td>MSTR</td><td class="buy">BUY</td><td>45</td><td>714.25</td><td>32,141.25</td><td>11:05:19</td><td>NASDAQ</td><td>2</td></tr>
-    <tr><td>2024-05-31</td><td>BTC</td><td class="sell">SELL</td><td>0.52</td><td>69,927.40</td><td>36,362.25</td><td>11:06:42</td><td>Coinbase</td><td>2</td></tr>
-
-    <tr><td>2024-06-14</td><td>MSTR</td><td class="buy">BUY</td><td>48</td><td>695.37</td><td>33,377.76</td><td>10:22:17</td><td>NASDAQ</td><td>3</td></tr>
-    <tr><td>2024-06-14</td><td>BTC</td><td class="sell">SELL</td><td>0.54</td><td>61,802.85</td><td>33,373.54</td><td>10:23:55</td><td>Coinbase</td><td>3</td></tr>
-    <tr><td>2024-07-05</td><td>MSTR</td><td class="sell">SELL</td><td>48</td><td>661.10</td><td>31,732.80</td><td>09:48:32</td><td>NASDAQ</td><td>3</td></tr>
-    <tr><td>2024-07-05</td><td>BTC</td><td class="buy">BUY</td><td>0.54</td><td>65,821.76</td><td>35,543.75</td><td>09:50:08</td><td>Coinbase</td><td>3</td></tr>
-
-    <tr><td>2024-07-12</td><td>MSTR</td><td class="sell">SELL</td><td>47</td><td>672.15</td><td>31,591.05</td><td>10:05:43</td><td>NASDAQ</td><td>4</td></tr>
-    <tr><td>2024-07-12</td><td>BTC</td><td class="buy">BUY</td><td>0.51</td><td>61,985.10</td><td>31,612.40</td><td>10:06:22</td><td>Coinbase</td><td>4</td></tr>
-    <tr><td>2024-08-02</td><td>MSTR</td><td class="buy">BUY</td><td>47</td><td>632.82</td><td>29,742.54</td><td>09:33:47</td><td>NASDAQ</td><td>4</td></tr>
-    <tr><td>2024-08-02</td><td>BTC</td><td class="sell">SELL</td><td>0.51</td><td>65,734.22</td><td>33,524.45</td><td>09:34:15</td><td>Coinbase</td><td>4</td></tr>
-
-    <tr><td>2024-08-09</td><td>MSTR</td><td class="buy">BUY</td><td>52</td><td>624.87</td><td>32,493.24</td><td>10:15:26</td><td>NASDAQ</td><td>5</td></tr>
-    <tr><td>2024-08-09</td><td>BTC</td><td class="sell">SELL</td><td>0.58</td><td>56,035.76</td><td>32,500.74</td><td>10:17:35</td><td>Coinbase</td><td>5</td></tr>
-    <tr><td>2024-08-30</td><td>MSTR</td><td class="sell">SELL</td><td>52</td><td>642.36</td><td>33,402.72</td><td>11:22:18</td><td>NASDAQ</td><td>5</td></tr>
-    <tr><td>2024-08-30</td><td>BTC</td><td class="buy">BUY</td><td>0.58</td><td>55,432.21</td><td>32,150.68</td><td>11:23:52</td><td>Coinbase</td><td>5</td></tr>
-
-    <tr><td>2024-09-06</td><td>MSTR</td><td class="sell">SELL</td><td>49</td><td>658.74</td><td>32,278.26</td><td>09:55:37</td><td>NASDAQ</td><td>6</td></tr>
-    <tr><td>2024-09-06</td><td>BTC</td><td class="buy">BUY</td><td>0.53</td><td>60,845.85</td><td>32,248.30</td><td>09:57:14</td><td>Coinbase</td><td>6</td></tr>
-    <tr><td>2024-09-27</td><td>MSTR</td><td class="buy">BUY</td><td>49</td><td>621.35</td><td>30,446.15</td><td>10:28:42</td><td>NASDAQ</td><td>6</td></tr>
-    <tr><td>2024-09-27</td><td>BTC</td><td class="sell">SELL</td><td>0.53</td><td>64,952.74</td><td>34,424.95</td><td>10:30:15</td><td>Coinbase</td><td>6</td></tr>
-
-    <tr><td>2024-10-04</td><td>MSTR</td><td class="buy">BUY</td><td>53</td><td>615.82</td><td>32,638.46</td><td>09:38:23</td><td>NASDAQ</td><td>7</td></tr>
-    <tr><td>2024-10-04</td><td>BTC</td><td class="sell">SELL</td><td>0.55</td><td>59,349.80</td><td>32,642.39</td><td>09:39:45</td><td>Coinbase</td><td>7</td></tr>
-    <tr><td>2024-10-25</td><td>MSTR</td><td class="sell">SELL</td><td>53</td><td>657.93</td><td>34,870.29</td><td>10:12:36</td><td>NASDAQ</td><td>7</td></tr>
-    <tr><td>2024-10-25</td><td>BTC</td><td class="buy">BUY</td><td>0.55</td><td>57,583.31</td><td>31,670.82</td><td>10:14:22</td><td>Coinbase</td><td>7</td></tr>
-
-    <tr><td>2024-11-01</td><td>MSTR</td><td class="sell">SELL</td><td>51</td><td>675.25</td><td>34,437.75</td><td>09:45:28</td><td>NASDAQ</td><td>8</td></tr>
-    <tr><td>2024-11-01</td><td>BTC</td><td class="buy">BUY</td><td>0.54</td><td>63,824.63</td><td>34,465.30</td><td>09:47:12</td><td>Coinbase</td><td>8</td></tr>
-    <tr><td>2024-11-22</td><td>MSTR</td><td class="buy">BUY</td><td>51</td><td>639.81</td><td>32,630.31</td><td>10:52:35</td><td>NASDAQ</td><td>8</td></tr>
-    <tr><td>2024-11-22</td><td>BTC</td><td class="sell">SELL</td><td>0.54</td><td>67,425.10</td><td>36,409.55</td><td>10:54:18</td><td>Coinbase</td><td>8</td></tr>
-
-    <tr><td>2024-11-29</td><td>MSTR</td><td class="buy">BUY</td><td>50</td><td>632.58</td><td>31,629.00</td><td>10:18:42</td><td>NASDAQ</td><td>9</td></tr>
-    <tr><td>2024-11-29</td><td>BTC</td><td class="sell">SELL</td><td>0.55</td><td>57,517.27</td><td>31,634.50</td><td>10:20:15</td><td>Coinbase</td><td>9</td></tr>
-    <tr><td>2024-12-20</td><td>MSTR</td><td class="sell">SELL</td><td>50</td><td>598.32</td><td>29,916.00</td><td>09:40:28</td><td>NASDAQ</td><td>9</td></tr>
-    <tr><td>2024-12-20</td><td>BTC</td><td class="buy">BUY</td><td>0.55</td><td>61,253.64</td><td>33,689.50</td><td>09:42:36</td><td>Coinbase</td><td>9</td></tr>
-
-    <tr><td>2024-12-27</td><td>MSTR</td><td class="sell">SELL</td><td>48</td><td>615.47</td><td>29,542.56</td><td>10:25:15</td><td>NASDAQ</td><td>10</td></tr>
-    <tr><td>2024-12-27</td><td>BTC</td><td class="buy">BUY</td><td>0.52</td><td>56,745.31</td><td>29,507.56</td><td>10:26:47</td><td>Coinbase</td><td>10</td></tr>
-    <tr><td>2025-01-17</td><td>MSTR</td><td class="buy">BUY</td><td>48</td><td>583.25</td><td>27,996.00</td><td>09:58:32</td><td>NASDAQ</td><td>10</td></tr>
-    <tr><td>2025-01-17</td><td>BTC</td><td class="sell">SELL</td><td>0.52</td><td>61,246.16</td><td>31,848.00</td><td>09:59:45</td><td>Coinbase</td><td>10</td></tr>
-
-    <tr><td>2025-01-24</td><td>MSTR</td><td class="buy">BUY</td><td>54</td><td>587.42</td><td>31,720.68</td><td>09:35:28</td><td>NASDAQ</td><td>11</td></tr>
-    <tr><td>2025-01-24</td><td>BTC</td><td class="sell">SELL</td><td>0.56</td><td>56,614.86</td><td>31,704.32</td><td>09:36:42</td><td>Coinbase</td><td>11</td></tr>
-    <tr><td>2025-02-14</td><td>MSTR</td><td class="sell">SELL</td><td>54</td><td>625.12</td><td>33,756.48</td><td>10:48:19</td><td>NASDAQ</td><td>11</td></tr>
-    <tr><td>2025-02-14</td><td>BTC</td><td class="buy">BUY</td><td>0.56</td><td>55,132.46</td><td>30,874.18</td><td>10:49:52</td><td>Coinbase</td><td>11</td></tr>
-
-    <tr><td>2025-02-21</td><td>MSTR</td><td class="sell">SELL</td><td>47</td><td>638.25</td><td>29,997.75</td><td>10:10:37</td><td>NASDAQ</td><td>12</td></tr>
-    <tr><td>2025-02-21</td><td>BTC</td><td class="buy">BUY</td><td>0.5</td><td>59,975.40</td><td>29,987.70</td><td>10:12:15</td><td>Coinbase</td><td>12</td></tr>
-    <tr><td>2025-03-14</td><td>MSTR</td><td class="buy">BUY</td><td>47</td><td>672.53</td><td>31,608.91</td><td>09:37:42</td><td>NASDAQ</td><td>12</td></tr>
-    <tr><td>2025-03-14</td><td>BTC</td><td class="sell">SELL</td><td>0.5</td><td>58,084.48</td><td>29,042.24</td><td>09:39:25</td><td>Coinbase</td><td>12</td></tr>
-
-    <tr><td>2025-03-21</td><td>MSTR</td><td class="buy">BUY</td><td>52</td><td>653.18</td><td>33,965.36</td><td>10:22:37</td><td>NASDAQ</td><td>13</td></tr>
-    <tr><td>2025-03-21</td><td>BTC</td><td class="sell">SELL</td><td>0.55</td><td>61,784.31</td><td>33,981.37</td><td>10:24:18</td><td>Coinbase</td><td>13</td></tr>
-    <tr><td>2025-04-04</td><td>MSTR</td><td class="sell">SELL</td><td>52</td><td>692.37</td><td>36,003.24</td><td>09:43:52</td><td>NASDAQ</td><td>13</td></tr>
-    <tr><td>2025-04-04</td><td>BTC</td><td class="buy">BUY</td><td>0.55</td><td>60,125.16</td><td>33,068.84</td><td>09:45:15</td><td>Coinbase</td><td>13</td></tr>
-  </tbody>
-</table>
+# Display table
+trade_metrics_df
 ```
 
-## Trading Ledger with Search
+### Position Analysis Over Time
 
-Use the search box below to filter trades by date or any other characteristic:
+```{python}
+#| echo: false
+#| warning: false
 
-```{=html}
-<style>
-#ledgerSearch {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 15px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
-}
+# Get position data for optimal strategy
+optimal_strategy = f'Pairs_Z{2.0}'
+position_data = backtest_results[optimal_strategy]['Data'][['Position', 'Z_Score', 'MSTR', 'BTC']]
 
-#ledgerTable {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
+# Create scatter plot with positions
+fig = go.Figure()
 
-#ledgerTable th {
-  background-color: #4CAF50;
-  color: white;
-  padding: 10px;
-  text-align: left;
-  border: 1px solid #ddd;
-}
+# Plot Z-Score
+fig.add_trace(
+    go.Scatter(
+        x=position_data.index,
+        y=position_data['Z_Score'],
+        mode='lines',
+        name='Z-Score',
+        line=dict(color='purple')
+    )
+)
 
-#ledgerTable td {
-  padding: 8px;
-  border: 1px solid #ddd;
-}
+# Add threshold lines
+fig.add_hline(y=optimal_threshold, line_dash="dash", line_color="red", annotation_text=f"Upper Threshold ({optimal_threshold})")
+fig.add_hline(y=-optimal_threshold, line_dash="dash", line_color="red", annotation_text=f"Lower Threshold (-{optimal_threshold})")
+fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
 
-#ledgerTable tr:nth-child(even) {
-  background-color: #f2f2f2;
-}
+# Add points for long positions
+long_positions = position_data[position_data['Position'] > 0]
+if not long_positions.empty:
+    fig.add_trace(
+        go.Scatter(
+            x=long_positions.index,
+            y=long_positions['Z_Score'],
+            mode='markers',
+            name='Long MSTR/Short BTC',
+            marker=dict(color='green', size=8, symbol='triangle-up')
+        )
+    )
 
-#ledgerTable tr:hover {
-  background-color: #ddd;
-}
+# Add points for short positions
+short_positions = position_data[position_data['Position'] < 0]
+if not short_positions.empty:
+    fig.add_trace(
+        go.Scatter(
+            x=short_positions.index,
+            y=short_positions['Z_Score'],
+            mode='markers',
+            name='Short MSTR/Long BTC',
+            marker=dict(color='red', size=8, symbol='triangle-down')
+        )
+    )
 
-.profit {
-  color: green;
-  font-weight: bold;
-}
+# Layout setup
+fig.update_layout(
+    title=f"Z-Score and Trading Positions (Threshold = {optimal_threshold})",
+    xaxis_title="Date",
+    yaxis_title="Z-Score",
+    hovermode="x unified",
+    height=500
+)
 
-.loss {
-  color: red;
-  font-weight: bold;
-}
-
-.section-title {
-  margin-top: 30px;
-  margin-bottom: 15px;
-  font-size: 20px;
-  font-weight: bold;
-}
-</style>
-
-<input type="text" id="ledgerSearch" placeholder="Search by date, position change, balance...">
-
-<table id="ledgerTable">
-  <thead>
-    <tr>
-      <th>Date</th>
-      <th>Cash Balance ($)</th>
-      <th>MSTR Position</th>
-      <th>MSTR Value ($)</th>
-      <th>BTC Position</th>
-      <th>BTC Value ($)</th>
-      <th>Total Portfolio Value ($)</th>
-      <th>Daily P&L ($)</th>
-      <th>Notes</th>
-    </tr>
-  </thead>
-  <tbody>
-    <!-- Initial balance -->
-    <tr><td>2024-04-11</td><td>500,000.00</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>500,000.00</td><td>0.00</td><td>Starting balance</td></tr>
-
-    <!-- Trade 1 events -->
-    <tr><td>2024-04-12</td><td>431,639.40</td><td>50</td><td>34,171.00</td><td>-0.56</td><td>-34,189.60</td><td>431,620.80</td><td class="loss">-379.20</td><td>Trade 1 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-04-19</td><td>431,639.40</td><td>50</td><td>35,225.00</td><td>-0.56</td><td>-33,513.76</td><td>433,350.64</td><td class="profit">1,729.84</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-04-26</td><td>431,639.40</td><td>50</td><td>36,200.00</td><td>-0.56</td><td>-32,899.36</td><td>434,940.04</td><td class="profit">1,589.40</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-05-03</td><td>504,478.40</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>504,478.40</td><td class="profit">1,538.36</td><td>Trade 1 exit (+4,857.60 profit)</td></tr>
-
-    <!-- Trade 2 events -->
-    <tr><td>2024-05-10</td><td>436,105.90</td><td>-45</td><td>-34,192.80</td><td>0.52</td><td>34,180.70</td><td>504,093.80</td><td class="loss">-384.60</td><td>Trade 2 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-05-17</td><td>436,105.90</td><td>-45</td><td>-33,325.95</td><td>0.52</td><td>35,654.32</td><td>506,434.27</td><td class="profit">2,340.47</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-05-24</td><td>436,105.90</td><td>-45</td><td>-32,751.30</td><td>0.52</td><td>36,852.36</td><td>508,206.96</td><td class="profit">1,772.69</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-05-31</td><td>510,326.90</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>510,326.90</td><td class="profit">2,119.94</td><td>Trade 2 exit (+6,233.10 profit)</td></tr>
-
-    <!-- Trade 3 events (loss) -->
-    <tr><td>2024-06-14</td><td>443,575.60</td><td>48</td><td>33,377.76</td><td>-0.54</td><td>-33,373.54</td><td>509,979.82</td><td class="loss">-347.08</td><td>Trade 3 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-06-21</td><td>443,575.60</td><td>48</td><td>32,126.40</td><td>-0.54</td><td>-35,102.04</td><td>507,000.96</td><td class="loss">-2,978.86</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-06-28</td><td>443,575.60</td><td>48</td><td>31,536.00</td><td>-0.54</td><td>-36,246.84</td><td>505,264.76</td><td class="loss">-1,736.20</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-07-05</td><td>506,175.05</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>506,175.05</td><td class="profit">910.29</td><td>Trade 3 exit (-3,804.77 loss)</td></tr>
-
-    <!-- Trade 4 events -->
-    <tr><td>2024-07-12</td><td>442,971.60</td><td>-47</td><td>-31,591.05</td><td>0.51</td><td>31,612.40</td><td>505,892.95</td><td class="loss">-282.10</td><td>Trade 4 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-07-19</td><td>442,971.60</td><td>-47</td><td>-30,835.32</td><td>0.51</td><td>33,286.23</td><td>508,322.51</td><td class="profit">2,429.56</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-07-26</td><td>442,971.60</td><td>-47</td><td>-30,214.63</td><td>0.51</td><td>34,452.12</td><td>510,109.09</td><td class="profit">1,786.58</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-08-02</td><td>509,653.51</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>509,653.51</td><td class="loss">-455.58</td><td>Trade 4 exit (+3,760.56 profit)</td></tr>
-
-    <!-- Trade 5 events -->
-    <tr><td>2024-08-09</td><td>444,659.53</td><td>52</td><td>32,493.24</td><td>-0.58</td><td>-32,500.74</td><td>509,252.03</td><td class="loss">-401.48</td><td>Trade 5 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-08-16</td><td>444,659.53</td><td>52</td><td>33,108.56</td><td>-0.58</td><td>-32,182.32</td><td>510,185.77</td><td class="profit">933.74</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-08-23</td><td>444,659.53</td><td>52</td><td>33,540.32</td><td>-0.58</td><td>-31,794.58</td><td>511,005.27</td><td class="profit">819.50</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-08-30</td><td>510,511.57</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>510,511.57</td><td class="loss">-493.70</td><td>Trade 5 exit (+1,259.54 profit)</td></tr>
-
-    <!-- Trade 6 events -->
-    <tr><td>2024-09-06</td><td>445,985.01</td><td>-49</td><td>-32,278.26</td><td>0.53</td><td>32,248.30</td><td>509,955.05</td><td class="loss">-556.52</td><td>Trade 6 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-09-13</td><td>445,985.01</td><td>-49</td><td>-31,354.37</td><td>0.53</td><td>33,582.56</td><td>512,213.20</td><td class="profit">2,258.15</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-09-20</td><td>445,985.01</td><td>-49</td><td>-30,825.98</td><td>0.53</td><td>34,348.72</td><td>513,507.75</td><td class="profit">1,294.55</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-09-27</td><td>513,963.81</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>513,963.81</td><td class="profit">456.06</td><td>Trade 6 exit (+4,008.76 profit)</td></tr>
-
-    <!-- Trade 7 events -->
-    <tr><td>2024-10-04</td><td>448,682.96</td><td>53</td><td>32,638.46</td><td>-0.55</td><td>-32,642.39</td><td>513,679.03</td><td class="loss">-284.78</td><td>Trade 7 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-10-11</td><td>448,682.96</td><td>53</td><td>33,724.87</td><td>-0.55</td><td>-31,925.84</td><td>515,481.99</td><td class="profit">1,802.96</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-10-18</td><td>448,682.96</td><td>53</td><td>34,521.75</td><td>-0.55</td><td>-31,157.37</td><td>517,047.34</td><td class="profit">1,565.35</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-10-25</td><td>516,882.43</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>516,882.43</td><td class="loss">-164.91</td><td>Trade 7 exit (+3,203.40 profit)</td></tr>
-
-    <!-- Trade 8 events -->
-    <tr><td>2024-11-01</td><td>447,979.38</td><td>-51</td><td>-34,437.75</td><td>0.54</td><td>34,465.30</td><td>516,906.93</td><td class="profit">24.50</td><td>Trade 8 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2024-11-08</td><td>447,979.38</td><td>-51</td><td>-33,679.10</td><td>0.54</td><td>35,849.96</td><td>519,050.24</td><td class="profit">2,143.31</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-11-15</td><td>447,979.38</td><td>-51</td><td>-33,215.84</td><td>0.54</td><td>36,578.22</td><td>520,241.76</td><td class="profit">1,191.52</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-11-22</td><td>520,658.62</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>520,658.62</td><td class="profit">416.86</td><td>Trade 8 exit (+3,751.69 profit)</td></tr>
-
-    <!-- Trade 9 events (loss) -->
-    <tr><td>2024-11-29</td><td>457,395.12</td><td>50</td><td>31,629.00</td><td>-0.55</td><td>-31,634.50</td><td>520,389.62</td><td class="loss">-269.00</td><td>Trade 9 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2024-12-06</td><td>457,395.12</td><td>50</td><td>30,584.50</td><td>-0.55</td><td>-33,382.40</td><td>517,597.22</td><td class="loss">-2,792.40</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-12-13</td><td>457,395.12</td><td>50</td><td>30,058.00</td><td>-0.55</td><td>-34,548.15</td><td>515,904.97</td><td class="loss">-1,692.25</td><td>Weekly valuation</td></tr>
-    <tr><td>2024-12-20</td><td>516,621.62</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>516,621.62</td><td class="profit">716.65</td><td>Trade 9 exit (-3,767.00 loss)</td></tr>
-
-    <!-- Trade 10 events -->
-    <tr><td>2024-12-27</td><td>457,571.50</td><td>-48</td><td>-29,542.56</td><td>0.52</td><td>29,507.56</td><td>516,536.50</td><td class="loss">-85.12</td><td>Trade 10 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2025-01-03</td><td>457,571.50</td><td>-48</td><td>-28,625.76</td><td>0.52</td><td>31,087.56</td><td>519,033.30</td><td class="profit">2,496.80</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-01-10</td><td>457,571.50</td><td>-48</td><td>-28,102.08</td><td>0.52</td><td>31,871.64</td><td>520,341.06</td><td class="profit">1,307.76</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-01-17</td><td>520,423.50</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>520,423.50</td><td class="profit">82.44</td><td>Trade 10 exit (+3,887.00 profit)</td></tr>
-
-    <!-- Trade 11 events -->
-    <tr><td>2025-01-24</td><td>456,998.50</td><td>54</td><td>31,720.68</td><td>-0.56</td><td>-31,704.32</td><td>521,014.86</td><td class="profit">591.36</td><td>Trade 11 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2025-01-31</td><td>456,998.50</td><td>54</td><td>32,756.94</td><td>-0.56</td><td>-30,935.76</td><td>522,819.68</td><td class="profit">1,804.82</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-02-07</td><td>456,998.50</td><td>54</td><td>33,468.72</td><td>-0.56</td><td>-30,324.64</td><td>524,142.58</td><td class="profit">1,322.90</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-02-14</td><td>523,880.80</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>523,880.80</td><td class="loss">-261.78</td><td>Trade 11 exit (+2,865.94 profit)</td></tr>
-
-    <!-- Trade 12 events (loss) -->
-    <tr><td>2025-02-21</td><td>463,895.35</td><td>-47</td><td>-29,997.75</td><td>0.5</td><td>29,987.70</td><td>523,885.30</td><td class="profit">4.50</td><td>Trade 12 entry (Short MSTR/Long BTC)</td></tr>
-    <tr><td>2025-02-28</td><td>463,895.35</td><td>-47</td><td>-31,101.67</td><td>0.5</td><td>29,206.50</td><td>522,000.18</td><td class="loss">-1,885.12</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-03-07</td><td>463,895.35</td><td>-47</td><td>-31,508.91</td><td>0.5</td><td>28,752.30</td><td>521,138.74</td><td class="loss">-861.44</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-03-14</td><td>521,328.68</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>521,328.68</td><td class="profit">189.94</td><td>Trade 12 exit (-2,556.62 loss)</td></tr>
-
-    <!-- Trade 13 events -->
-    <tr><td>2025-03-21</td><td>453,381.95</td><td>52</td><td>33,965.36</td><td>-0.55</td><td>-33,981.37</td><td>521,315.94</td><td class="loss">-12.74</td><td>Trade 13 entry (Long MSTR/Short BTC)</td></tr>
-    <tr><td>2025-03-28</td><td>453,381.95</td><td>52</td><td>35,025.96</td><td>-0.55</td><td>-33,275.45</td><td>523,082.46</td><td class="profit">1,766.52</td><td>Weekly valuation</td></tr>
-    <tr><td>2025-04-04</td><td>524,316.35</td><td>0</td><td>0.00</td><td>0.00</td><td>0.00</td><td>524,316.35</td><td class="profit">1,233.89</td><td>Trade 13 exit (+2,950.41 profit)</td></tr>
-  </tbody>
-</table>
-
-<script>
-document.getElementById('ledgerSearch').addEventListener('keyup', function() {
-  var input = this.value.toLowerCase();
-  var rows = document.getElementById('ledgerTable').getElementsByTagName('tbody')[0].getElementsByTagName('tr');
-
-  for (var i = 0; i < rows.length; i++) {
-    var showRow = false;
-    var cells = rows[i].getElementsByTagName('td');
-
-    for (var j = 0; j < cells.length; j++) {
-      var cellText = cells[j].textContent || cells[j].innerText;
-
-      if (cellText.toLowerCase().indexOf(input) > -1) {
-        showRow = true;
-        break;
-      }
-    }
-
-    rows[i].style.display = showRow ? '' : 'none';
-  }
-});
-</script>
+fig.show()
 ```
 
-### Trading Performance Summary
+### Distribution of Trade Returns
 
-Below is a summary of our trading performance across different trade types:
+```{python}
+#| echo: false
+#| warning: false
 
-```{=html}
-<style>
-.stats-container {
-  margin-top: 30px;
-  margin-bottom: 30px;
-}
+# Get trade returns for optimal strategy
+optimal_strategy = f'Pairs_Z{2.0}'
+trade_returns = [trade['Total_Return'] for trade in backtest_results[optimal_strategy]['Trades']]
 
-.stats-box {
-  background-color: #f8f9fa;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
+# Create histogram of trade returns
+fig = px.histogram(
+    x=trade_returns,
+    nbins=20,
+    title=f"Distribution of Trade Returns (Z-Score Threshold = {optimal_threshold})",
+    labels={'x': 'Trade Return', 'y': 'Frequency'},
+    color_discrete_sequence=['green']
+)
 
-.stats-header {
-  font-size: 22px;
-  font-weight: bold;
-  margin-bottom: 15px;
-  color: #2e7d32;
-  border-bottom: 2px solid #2e7d32;
-  padding-bottom: 8px;
-}
+# Add median line
+median_return = np.median(trade_returns)
+fig.add_vline(x=median_return, line_dash="dash", line_color="red",
+             annotation_text=f"Median: {median_return:.2%}")
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
+# Add zero line
+fig.add_vline(x=0, line_dash="solid", line_color="black")
 
-.stats-card {
-  background-color: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
+# Update layout
+fig.update_layout(
+    xaxis_title="Trade Return",
+    yaxis_title="Number of Trades",
+    height=400
+)
 
-.stats-title {
-  font-weight: bold;
-  color: #555;
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-
-.stats-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-}
-
-.stats-value.positive {
-  color: #2e7d32;
-}
-
-.stats-value.negative {
-  color: #c62828;
-}
-
-.stats-subtitle {
-  font-size: 12px;
-  color: #757575;
-  margin-top: 5px;
-}
-
-.stats-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-}
-
-.stats-table th {
-  background-color: #f2f2f2;
-  border: 1px solid #ddd;
-  padding: 10px;
-  text-align: left;
-}
-
-.stats-table td {
-  border: 1px solid #ddd;
-  padding: 10px;
-}
-
-.stats-table tr:nth-child(even) {
-  background-color: #f9f9f9;
-}
-
-.benchmark-comparison {
-  margin-top: 20px;
-}
-
-.benchmark-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 10px;
-  color: #333;
-}
-</style>
-
-<div class="stats-container">
-  <h2 class="section-title">Performance Statistics</h2>
-
-  <div class="stats-box">
-    <div class="stats-header">Strategy Performance Metrics</div>
-
-    <div class="stats-grid">
-      <!-- Risk Metrics -->
-      <div class="stats-card">
-        <div class="stats-title">CORRELATION (MSTR-BTC)</div>
-        <div class="stats-value">0.7160</div>
-        <div class="stats-subtitle">Strong positive correlation between assets</div>
-      </div>
-
-      <div class="stats-card">
-        <div class="stats-title">BETA (MSTR to BTC)</div>
-        <div class="stats-value">1.3948</div>
-        <div class="stats-subtitle">MSTR is more volatile than BTC</div>
-      </div>
-
-      <div class="stats-card">
-        <div class="stats-title">BEST STRATEGY SHARPE RATIO</div>
-        <div class="stats-value positive">1.53</div>
-        <div class="stats-subtitle">Hold MSTR strategy using 4% risk-free rate</div>
-      </div>
-
-      <div class="stats-card">
-        <div class="stats-title">BEST PAIRS STRATEGY SHARPE RATIO</div>
-        <div class="stats-value positive">1.47</div>
-        <div class="stats-subtitle">Z-score threshold of 2.0</div>
-      </div>
-
-      <!-- Return Metrics -->
-      <div class="stats-card">
-        <div class="stats-title">BEST STRATEGY ANNUAL RETURN</div>
-        <div class="stats-value positive">159.52%</div>
-        <div class="stats-subtitle">Hold MSTR strategy</div>
-      </div>
-
-      <div class="stats-card">
-        <div class="stats-title">BEST PAIRS STRATEGY ANNUAL RETURN</div>
-        <div class="stats-value positive">66.38%</div>
-        <div class="stats-subtitle">Z-score threshold of 2.0</div>
-      </div>
-
-      <div class="stats-card">
-        <div class="stats-title">PAIRS STRATEGY MAX DRAWDOWN</div>
-        <div class="stats-value negative">-18.01%</div>
-        <div class="stats-subtitle">For Z-score threshold of 2.0</div>
-      </div>
-
-      <div class="stats-card">
-        <div class="stats-title">HOLD MSTR MAX DRAWDOWN</div>
-        <div class="stats-value negative">-49.78%</div>
-        <div class="stats-subtitle">Much higher than pairs trading drawdown</div>
-      </div>
-    </div>
-
-    <div class="benchmark-comparison">
-      <div class="benchmark-title">Performance vs. Benchmarks</div>
-      <table class="stats-table">
-        <thead>
-          <tr>
-            <th>Performance Metric</th>
-            <th>Pairs Z2.0</th>
-            <th>Hold MSTR</th>
-            <th>Hold BTC</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Annual Return</td>
-            <td>66.38%</td>
-            <td>159.52%</td>
-            <td>47.04%</td>
-          </tr>
-          <tr>
-            <td>Annual Volatility</td>
-            <td>42.46%</td>
-            <td>101.69%</td>
-            <td>52.58%</td>
-          </tr>
-          <tr>
-            <td>Sharpe Ratio</td>
-            <td>1.47</td>
-            <td>1.53</td>
-            <td>0.82</td>
-          </tr>
-          <tr>
-            <td>Maximum Drawdown</td>
-            <td>-18.01%</td>
-            <td>-49.78%</td>
-            <td>-28.11%</td>
-          </tr>
-          <tr>
-            <td>Position Days Ratio</td>
-            <td>12.17%</td>
-            <td>100%</td>
-            <td>100%</td>
-          </tr>
-          <tr>
-            <td>Trade Count</td>
-            <td>34</td>
-            <td>N/A</td>
-            <td>N/A</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Performance Calculation Methodology -->
-  <div class="stats-box">
-    <div class="stats-header">Performance Calculation Methodology</div>
-    <p>The performance statistics were calculated from real market data spanning two years of trading history. The strategy was backtested using different Z-score thresholds to identify the optimal configuration.</p>
-
-    <ul>
-      <li><strong>Alpha and Beta:</strong> The MSTR-BTC relationship shows MSTR with a beta of 1.3948 to BTC, indicating that MSTR is approximately 39.5% more volatile than BTC.</li>
-
-      <li><strong>Volatility:</strong> Annualized standard deviation of daily returns shows significantly lower volatility for the pairs trading strategy (42.46%) compared to a buy-and-hold approach for MSTR (101.69%).</li>
-
-      <li><strong>Sharpe Ratio:</strong> (Annual Return - Risk-Free Rate) / Annual Volatility, using a 4% annual risk-free rate. The pairs trading strategy (Z-score 2.0) achieved a strong Sharpe ratio of 1.47, comparable to the 1.53 of holding MSTR despite much lower volatility.</li>
-
-      <li><strong>Maximum Drawdown:</strong> The pairs trading strategy's maximum drawdown (-18.01%) is significantly better than holding MSTR (-49.78%), providing much better capital preservation during market downturns.</li>
-
-      <li><strong>Trade Frequency:</strong> With a Z-score threshold of 2.0, the strategy generated 34 trades during the backtest period, with a position days ratio of 12.17%, indicating the selective nature of the trading signals.</li>
-    </ul>
-
-    <p>These statistics demonstrate that while the pairs trading strategy produces lower absolute returns than holding MSTR, it achieves this with significantly reduced risk (lower volatility and drawdowns), resulting in comparable risk-adjusted returns as measured by the Sharpe ratio.</p>
-  </div>
-
-  <!-- Trading Capital Efficiency -->
-  <div class="stats-box">
-    <div class="stats-header">Trading Capital Efficiency</div>
-    <p>The strategy demonstrates strong capital efficiency with each trade utilizing approximately 13-14% of total portfolio value. Based on the detailed performance metrics, we can highlight the following efficiency characteristics:</p>
-
-    <table class="stats-table">
-      <thead>
-        <tr>
-          <th>Efficiency Metric</th>
-          <th>Value</th>
-          <th>Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Capital Utilization</td>
-          <td>12.17%</td>
-          <td>Average percentage of time with active positions</td>
-        </tr>
-        <tr>
-          <td>Win Ratio (Z-score 2.0)</td>
-          <td>6.09%</td>
-          <td>Percentage of days with positive returns</td>
-        </tr>
-        <tr>
-          <td>Trade Count</td>
-          <td>34</td>
-          <td>Number of trades with Z-score threshold of 2.0</td>
-        </tr>
-        <tr>
-          <td>Return per Unit of Risk</td>
-          <td>3.69</td>
-          <td>Annual Return / Max Drawdown</td>
-        </tr>
-        <tr>
-          <td>Low Correlation to Market</td>
-          <td>Moderate</td>
-          <td>Strategy provides some diversification benefits</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p>The selective nature of this strategy (12.17% position days ratio) highlights that it can be effectively implemented with a relatively modest allocation of total portfolio capital. The conservative capital utilization helps manage risk while still delivering strong returns. The high return per unit of risk (3.69) demonstrates the robustness of the strategy compared to traditional buy-and-hold approaches.</p>
-  </div>
-</div>
+fig.show()
 ```
 
 ## Strategy Performance Comparison
@@ -1332,14 +842,15 @@ To evaluate the performance of our pairs trading strategy, we conduct backtests 
 #| warning: false
 #| message: false
 
-import plotly.express as px
-
 # Create DataFrame for cumulative return comparison
 cum_returns_data_all = pd.DataFrame()
+
+# Add pairs trading strategies
 for threshold in thresholds:
     strategy = f'Pairs_Z{threshold}'
-    cum_returns_data_all[strategy] = backtest_results[strategy]['Cumulative']
+    cum_returns_data_all[strategy] = backtest_results[strategy]['Data']['Cumulative_Return']
 
+# Add buy-and-hold strategies
 cum_returns_data_all['Hold_MSTR'] = backtest_results['Hold_MSTR']['Cumulative']
 cum_returns_data_all['Hold_BTC'] = backtest_results['Hold_BTC']['Cumulative']
 
@@ -1383,8 +894,9 @@ To further understand the behavior of the most effective pairs trading strategy,
 #| message: false
 
 # Prepare dataframe for optimal strategy comparison
+optimal_strategy = f'Pairs_Z{optimal_threshold}'
 optimal_vs_hold = pd.DataFrame({
-    'Pairs_Z2.0': backtest_results['Pairs_Z2.0']['Cumulative'],
+    optimal_strategy: backtest_results[optimal_strategy]['Data']['Cumulative_Return'],
     'Hold_MSTR': backtest_results['Hold_MSTR']['Cumulative'],
     'Hold_BTC': backtest_results['Hold_BTC']['Cumulative']
 }).reset_index().rename(columns={'index': 'date'})
@@ -1393,14 +905,14 @@ optimal_vs_hold = pd.DataFrame({
 fig = px.line(
     optimal_vs_hold,
     x='date',
-    y=['Pairs_Z2.0', 'Hold_MSTR', 'Hold_BTC'],
-    title='Optimal Pairs Strategy (Z=2.0) vs Buy-and-Hold',
+    y=[optimal_strategy, 'Hold_MSTR', 'Hold_BTC'],
+    title=f'Optimal Pairs Strategy (Z={optimal_threshold}) vs Buy-and-Hold',
     labels={
         'value': 'Cumulative Return (Initial Investment = 1)',
         'variable': 'Strategy'
     },
     color_discrete_map={
-        'Pairs_Z2.0': 'green',
+        optimal_strategy: 'green',
         'Hold_MSTR': 'blue',
         'Hold_BTC': 'red'
     }
@@ -1420,41 +932,97 @@ fig.update_layout(
 fig.show()
 ```
 
-## Strategy Implementation
+### Sharpe Ratio Comparison
 
-### Position Sizing
+```{python}
+#| echo: false
+#| warning: false
 
-For each trade:
-- Allocate equal dollar amounts to both legs of the pair
-- Limit each position to 10% of total portfolio value
-- Adjust position sizes based on historical volatility
+# Extract Sharpe ratios for each strategy
+sharpe_ratios = {strategy: performance_df.loc[strategy, 'Sharpe Ratio']
+                for strategy in performance_df.index}
 
-### Trade Execution
+# Create bar chart of Sharpe ratios
+fig = px.bar(
+    x=list(sharpe_ratios.keys()),
+    y=list(sharpe_ratios.values()),
+    title='Sharpe Ratio Comparison Across Strategies',
+    labels={'x': 'Strategy', 'y': 'Sharpe Ratio'},
+    color=list(sharpe_ratios.keys()),
+    color_discrete_map={
+        'Hold_MSTR': 'blue',
+        'Hold_BTC': 'red',
+        'Pairs_Z0.5': 'lightgreen',
+        'Pairs_Z1.0': 'green',
+        'Pairs_Z1.5': 'darkgreen',
+        'Pairs_Z2.0': 'darkblue',
+        'Pairs_Z2.5': 'purple'
+    }
+)
 
-The strategy employs the following execution approach:
-1. Calculate MSTR/BTC price ratio and Z-score daily (after market close)
-2. Generate signals for next day's market open
-3. Execute trades at market open with limit orders (5-minute window)
-4. Monitor positions throughout the trading day
-5. Adjust stop-loss levels daily based on new data
+fig.update_layout(
+    xaxis_title="Strategy",
+    yaxis_title="Sharpe Ratio",
+    height=400
+)
 
-### Risk Management
+fig.show()
+```
 
-Beyond individual trade stop-losses, the strategy incorporates the following risk controls:
+### Trade Win Rate vs Z-Score Threshold
 
-1. **Maximum Portfolio Exposure**: No more than 30% of portfolio in pairs trades at any time
-2. **Correlation Monitoring**: Pause trading if 30-day correlation drops below 0.7
-3. **Volatility Filter**: Reduce position sizes during high market volatility periods
-4. **Market Event Filter**: Avoid entering positions around Bitcoin halving events or MSTR earnings
+```{python}
+#| echo: false
+#| warning: false
+
+# Prepare data for win rate comparison
+win_rates = []
+for threshold in thresholds:
+    strategy = f'Pairs_Z{threshold}'
+    if 'Win Rate' in trade_metrics.get(strategy, {}):
+        win_rate = trade_metrics[strategy]['Win Rate']
+        win_rates.append({'Threshold': threshold, 'Win Rate': win_rate})
+    else:
+        # If win rate isn't available, calculate it from trades
+        trades = backtest_results[strategy]['Trades']
+        if trades:
+            winning_trades = sum(1 for trade in trades if trade['Total_Return'] > 0)
+            win_rate = winning_trades / len(trades)
+            win_rates.append({'Threshold': threshold, 'Win Rate': win_rate})
+        else:
+            win_rates.append({'Threshold': threshold, 'Win Rate': 0})
+
+win_rates_df = pd.DataFrame(win_rates)
+
+# Create bar chart
+fig = px.bar(
+    win_rates_df,
+    x='Threshold',
+    y='Win Rate',
+    title='Trade Win Rate by Z-Score Threshold',
+    labels={'Threshold': 'Z-Score Threshold', 'Win Rate': 'Win Rate'},
+    color='Threshold',
+    color_continuous_scale='Viridis'
+)
+
+fig.update_layout(
+    xaxis_title="Z-Score Threshold",
+    yaxis_title="Win Rate",
+    yaxis_tickformat='.0%',
+    height=400
+)
+
+fig.show()
+```
 
 ## Conclusion
 
 This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. Based on our real market data analysis, the optimal configuration uses a Z-score threshold of 2.0, providing a balance between signal quality and trading frequency.
 
-While our backtest shows that simply holding MSTR would have yielded higher absolute returns (159.52% annual return vs. 66.38% for pairs trading), the pairs trading approach demonstrates significantly better risk characteristics:
+While our backtest shows that simply holding MSTR would have yielded higher absolute returns, the pairs trading approach demonstrates significantly better risk characteristics:
 
-1. **Lower Maximum Drawdown**: -18.01% for pairs trading vs. -49.78% for holding MSTR
-2. **Lower Volatility**: 42.46% for pairs trading vs. 101.69% for holding MSTR
-3. **Comparable Sharpe Ratio**: 1.47 for pairs trading vs. 1.53 for holding MSTR
+1. **Lower Maximum Drawdown** for pairs trading vs. holding MSTR
+2. **Lower Volatility** for pairs trading vs. holding MSTR
+3. **Comparable Sharpe Ratio** for pairs trading vs. holding MSTR
 
 The strategy's key advantage is its reduced drawdown and lower volatility compared to holding either asset individually, making it valuable for portfolio diversification. Future enhancements will include machine learning-based signal generation and intraday trading capability.
