@@ -1,7 +1,7 @@
 ---
 title: "MSTR-BTC Pairs Trading Strategy"
 author: "Jack Li, Bill Wang, Paul Zhao"
-date: "April 11, 2025"
+date: "April 25, 2025"
 format:
   html:
     toc: true
@@ -105,18 +105,8 @@ from statsmodels.regression.linear_model import OLS
 import plotly.express as px
 import datetime
 
-# Create sample price data for demonstration
-np.random.seed(42)  # For reproducibility
-dates = pd.date_range(start='2024-04-01', end='2025-04-01', freq='B') # Business days for a year
-btc_price = 40000 * (1 + np.cumsum(np.random.normal(0.001, 0.02, len(dates))))
-mstr_price = 400 * (1 + np.cumsum(np.random.normal(0.001, 0.03, len(dates))))
-mstr_price = mstr_price + 5 * np.sin(np.linspace(0, 10, len(dates)))  # Add some oscillation
-
-# Create dataframe
-data = pd.DataFrame({
-    'MSTR': mstr_price,
-    'BTC': btc_price
-}, index=dates)
+# Load real data from CSV
+data = pd.read_csv('data/mstr_btc_data_2Y_daily.csv', index_col=0, parse_dates=True)
 
 # Calculate returns
 returns = data.pct_change().dropna()
@@ -171,6 +161,10 @@ def run_simple_backtest(data, threshold, risk_free_rate=0.04):
     win_days = (strategy_returns > 0).sum()
     win_ratio = win_days / len(strategy_returns)
 
+    # Calculate position days ratio
+    position_days = (position != 0).sum()
+    position_ratio = position_days / len(position)
+
     return {
         'Returns': strategy_returns,
         'Cumulative': cumulative_returns,
@@ -179,7 +173,8 @@ def run_simple_backtest(data, threshold, risk_free_rate=0.04):
         'Sharpe Ratio': sharpe_ratio,
         'Max Drawdown': max_drawdown,
         'Trade Count': trade_count,
-        'Win Ratio': win_ratio
+        'Win Ratio': win_ratio,
+        'Position Days Ratio': position_ratio
     }
 
 # Run backtests for different thresholds
@@ -198,35 +193,81 @@ mstr_cumulative = (1 + mstr_returns).cumprod()
 backtest_results['Hold_BTC'] = {
     'Returns': btc_returns,
     'Cumulative': btc_cumulative,
-    'Annual Return': btc_cumulative.iloc[-1] ** (252 / len(btc_returns)) - 1,
-    'Annual Volatility': btc_returns.std() * np.sqrt(252),
-    'Sharpe Ratio': (btc_cumulative.iloc[-1] ** (252 / len(btc_returns)) - 1 - 0.04) / (btc_returns.std() * np.sqrt(252)),
-    'Max Drawdown': (btc_cumulative / btc_cumulative.cummax() - 1).min()
+    'Annual Return': 0.470361,  # From actual results
+    'Annual Volatility': 0.525767,  # From actual results
+    'Sharpe Ratio': 0.818539,  # From actual results
+    'Max Drawdown': -0.281130  # From actual results
 }
 
 backtest_results['Hold_MSTR'] = {
     'Returns': mstr_returns,
     'Cumulative': mstr_cumulative,
-    'Annual Return': mstr_cumulative.iloc[-1] ** (252 / len(mstr_returns)) - 1,
-    'Annual Volatility': mstr_returns.std() * np.sqrt(252),
-    'Sharpe Ratio': (mstr_cumulative.iloc[-1] ** (252 / len(mstr_returns)) - 1 - 0.04) / (mstr_returns.std() * np.sqrt(252)),
-    'Max Drawdown': (mstr_cumulative / mstr_cumulative.cummax() - 1).min()
+    'Annual Return': 1.595177,  # From actual results
+    'Annual Volatility': 1.016850,  # From actual results
+    'Sharpe Ratio': 1.529407,  # From actual results
+    'Max Drawdown': -0.497816  # From actual results
 }
 
-# Create performance summary dataframe
-performance_summary = {}
-for strategy, results in backtest_results.items():
-    performance_summary[strategy] = {
-        'Annual Return': results['Annual Return'],
-        'Annual Volatility': results['Annual Volatility'],
-        'Sharpe Ratio': results['Sharpe Ratio'],
-        'Max Drawdown': results['Max Drawdown']
+# Create performance summary dataframe (using actual results)
+performance_df = pd.DataFrame({
+    'Pairs_Z0.5': {
+        'Annual Return': 0.216169,
+        'Annual Volatility': 0.680870,
+        'Sharpe Ratio': 0.258742,
+        'Max Drawdown': -0.537857,
+        'Trade Count': 64.0,
+        'Position Days Ratio': 0.695652,
+        'Win Ratio': 0.360870
+    },
+    'Pairs_Z1.0': {
+        'Annual Return': 0.482885,
+        'Annual Volatility': 0.570563,
+        'Sharpe Ratio': 0.776224,
+        'Max Drawdown': -0.426954,
+        'Trade Count': 51.0,
+        'Position Days Ratio': 0.439130,
+        'Win Ratio': 0.221739
+    },
+    'Pairs_Z1.5': {
+        'Annual Return': 0.571179,
+        'Annual Volatility': 0.483172,
+        'Sharpe Ratio': 1.099357,
+        'Max Drawdown': -0.318907,
+        'Trade Count': 44.0,
+        'Position Days Ratio': 0.256522,
+        'Win Ratio': 0.121739
+    },
+    'Pairs_Z2.0': {
+        'Annual Return': 0.663850,
+        'Annual Volatility': 0.424579,
+        'Sharpe Ratio': 1.469336,
+        'Max Drawdown': -0.180093,
+        'Trade Count': 34.0,
+        'Position Days Ratio': 0.121739,
+        'Win Ratio': 0.060870
+    },
+    'Pairs_Z2.5': {
+        'Annual Return': 0.272222,
+        'Annual Volatility': 0.281886,
+        'Sharpe Ratio': 0.823814,
+        'Max Drawdown': -0.115443,
+        'Trade Count': 10.0,
+        'Position Days Ratio': 0.034783,
+        'Win Ratio': 0.021739
+    },
+    'Hold_MSTR': {
+        'Annual Return': 1.595177,
+        'Annual Volatility': 1.016850,
+        'Sharpe Ratio': 1.529407,
+        'Max Drawdown': -0.497816
+    },
+    'Hold_BTC': {
+        'Annual Return': 0.470361,
+        'Annual Volatility': 0.525767,
+        'Sharpe Ratio': 0.818539,
+        'Max Drawdown': -0.281130
     }
-    if 'Trade Count' in results:
-        performance_summary[strategy]['Trade Count'] = results['Trade Count']
-        performance_summary[strategy]['Win Ratio'] = results['Win Ratio']
-
-performance_df = pd.DataFrame(performance_summary).T
+}).T
 
 # Format for display
 display_df = performance_df.copy()
@@ -235,6 +276,8 @@ for col in ['Annual Return', 'Annual Volatility', 'Max Drawdown']:
 display_df['Sharpe Ratio'] = display_df['Sharpe Ratio'].map('{:.2f}'.format)
 if 'Win Ratio' in display_df.columns:
     display_df['Win Ratio'] = display_df['Win Ratio'].map('{:.2%}'.format)
+if 'Position Days Ratio' in display_df.columns:
+    display_df['Position Days Ratio'] = display_df['Position Days Ratio'].map('{:.2%}'.format)
 if 'Trade Count' in display_df.columns:
     display_df['Trade Count'] = display_df['Trade Count'].map('{:.0f}'.format)
 
@@ -381,22 +424,22 @@ Risk management is implemented through the following stop loss rules:
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# 创建带有两个Y轴的子图
+# Create a subplot with two Y-axes
 fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-# 添加MSTR价格线
+# Add MSTR price line
 fig.add_trace(
     go.Scatter(x=data.index, y=data['MSTR'], name="MSTR", line=dict(color='blue')),
     secondary_y=False,
 )
 
-# 添加BTC价格线
+# Add BTC price line
 fig.add_trace(
     go.Scatter(x=data.index, y=data['BTC'], name="BTC", line=dict(color='red')),
     secondary_y=True,
 )
 
-# 设置标题和坐标轴标签
+# Set title and axis labels
 fig.update_layout(
     title_text="MSTR vs BTC Price Trends",
     hovermode="x unified"
@@ -406,7 +449,7 @@ fig.update_xaxes(title_text="Date")
 fig.update_yaxes(title_text="MSTR Price ($)", secondary_y=False, color='blue')
 fig.update_yaxes(title_text="BTC Price ($)", secondary_y=True, color='red')
 
-# 添加范围滑块以进行交互式缩放
+# Add range slider for interactive zooming
 fig.update_layout(
     xaxis=dict(
         rangeslider=dict(visible=True),
@@ -527,42 +570,19 @@ The key metrics that validate our pairs trading approach:
 #| warning: false
 #| message: false
 
-# Calculate correlation
-correlation = returns.corr().iloc[0, 1]
-
-# Calculate beta
-X = sm.add_constant(returns['BTC'])
-model = OLS(returns['MSTR'], X).fit()
-beta = model.params['BTC']
-
-# Calculate price ratio statistics
-ratio_mean = data['Ratio'].mean()
-ratio_std = data['Ratio'].std()
-
-# ADF test for stationarity
-adf_result = sm.tsa.stattools.adfuller(data['Ratio'].dropna())
-adf_pvalue = adf_result[1]
-
-# Create table of metrics
+# Create table of metrics using actual values provided by the user
 metrics = pd.DataFrame({
     'Metric': ['Correlation Coefficient', 'Beta (MSTR to BTC)',
                'Average Price Ratio', 'Price Ratio StdDev', 'ADF Test p-value'],
-    'Value': [correlation, beta, ratio_mean, ratio_std, adf_pvalue]
+    'Value': ['0.7160', '1.3948', '0.0030', '0.0007', '0.5789 (Non-stationary)']
 })
-
-# Format the values
-metrics['Value'] = [f'{correlation:.4f}',
-                    f'{beta:.4f}',
-                    f'{ratio_mean:.4f}',
-                    f'{ratio_std:.4f}',
-                    f'{adf_pvalue:.4f} ({"Stationary" if adf_pvalue < 0.05 else "Non-stationary"})']
 
 metrics
 ```
 
 ## Backtest Results
 
-The performance of our pairs trading strategy with different Z-score thresholds:
+The performance of our pairs trading strategy with different Z-score thresholds compared to buy-and-hold strategies:
 
 ```{python}
 #| echo: false
@@ -595,10 +615,10 @@ cum_returns_data['Hold_BTC'] = backtest_results['Hold_BTC']['Cumulative']
 
 # Reset index for plotting
 cum_returns_data = cum_returns_data.reset_index()
-cum_returns_data = cum_returns_data.rename(columns={'index': 'Date'})
+cum_returns_data = cum_returns_data.rename(columns={'index': 'date'})
 
 # Plot with plotly
-fig = px.line(cum_returns_data, x='Date', y=['Pairs_Z2.0', 'Hold_MSTR', 'Hold_BTC'],
+fig = px.line(cum_returns_data, x='date', y=['Pairs_Z2.0', 'Hold_MSTR', 'Hold_BTC'],
               title='Cumulative Returns: Pairs Trading vs Buy-and-Hold',
               labels={'value': 'Cumulative Return (Initial = 1)', 'variable': 'Strategy'},
               color_discrete_map={
@@ -626,7 +646,7 @@ fig.show()
 #| echo: false
 #| warning: false
 
-# Create simple risk-return table instead of scatter plot
+# Create simple risk-return table
 risk_return_table = performance_df[['Annual Return', 'Annual Volatility', 'Sharpe Ratio']].copy()
 
 # Format for display
@@ -1134,52 +1154,52 @@ Below is a summary of our trading performance across different trade types:
     <div class="stats-grid">
       <!-- Risk Metrics -->
       <div class="stats-card">
-        <div class="stats-title">ALPHA (ANNUALIZED)</div>
-        <div class="stats-value positive">4.53%</div>
-        <div class="stats-subtitle">vs. 60% BTC / 40% S&P 500 benchmark</div>
+        <div class="stats-title">CORRELATION (MSTR-BTC)</div>
+        <div class="stats-value">0.7160</div>
+        <div class="stats-subtitle">Strong positive correlation between assets</div>
       </div>
 
       <div class="stats-card">
-        <div class="stats-title">BETA</div>
-        <div class="stats-value">0.29</div>
-        <div class="stats-subtitle">Low correlation to benchmark</div>
+        <div class="stats-title">BETA (MSTR to BTC)</div>
+        <div class="stats-value">1.3948</div>
+        <div class="stats-subtitle">MSTR is more volatile than BTC</div>
       </div>
 
       <div class="stats-card">
-        <div class="stats-title">VOLATILITY (ANNUALIZED)</div>
-        <div class="stats-value">9.87%</div>
-        <div class="stats-subtitle">vs. 41.25% for BTC and 27.34% for MSTR</div>
+        <div class="stats-title">BEST STRATEGY SHARPE RATIO</div>
+        <div class="stats-value positive">1.53</div>
+        <div class="stats-subtitle">Hold MSTR strategy using 4% risk-free rate</div>
       </div>
 
       <div class="stats-card">
-        <div class="stats-title">SHARPE RATIO</div>
-        <div class="stats-value positive">2.14</div>
-        <div class="stats-subtitle">Using 4% risk-free rate</div>
+        <div class="stats-title">BEST PAIRS STRATEGY SHARPE RATIO</div>
+        <div class="stats-value positive">1.47</div>
+        <div class="stats-subtitle">Z-score threshold of 2.0</div>
       </div>
 
       <!-- Return Metrics -->
       <div class="stats-card">
-        <div class="stats-title">GEOMETRIC MEAN RATE OF RETURN</div>
-        <div class="stats-value positive">25.12%</div>
-        <div class="stats-subtitle">Annualized</div>
+        <div class="stats-title">BEST STRATEGY ANNUAL RETURN</div>
+        <div class="stats-value positive">159.52%</div>
+        <div class="stats-subtitle">Hold MSTR strategy</div>
       </div>
 
       <div class="stats-card">
-        <div class="stats-title">AVERAGE RETURN PER TRADE</div>
-        <div class="stats-value positive">1.87%</div>
-        <div class="stats-subtitle">Based on 13 completed trades</div>
+        <div class="stats-title">BEST PAIRS STRATEGY ANNUAL RETURN</div>
+        <div class="stats-value positive">66.38%</div>
+        <div class="stats-subtitle">Z-score threshold of 2.0</div>
       </div>
 
       <div class="stats-card">
-        <div class="stats-title">WIN RATE</div>
-        <div class="stats-value">76.92%</div>
-        <div class="stats-subtitle">10 winning trades out of 13</div>
+        <div class="stats-title">PAIRS STRATEGY MAX DRAWDOWN</div>
+        <div class="stats-value negative">-18.01%</div>
+        <div class="stats-subtitle">For Z-score threshold of 2.0</div>
       </div>
 
       <div class="stats-card">
-        <div class="stats-title">TRADES PER YEAR</div>
-        <div class="stats-value">14</div>
-        <div class="stats-subtitle">Based on trading frequency (Apr 2024-Apr 2025)</div>
+        <div class="stats-title">HOLD MSTR MAX DRAWDOWN</div>
+        <div class="stats-value negative">-49.78%</div>
+        <div class="stats-subtitle">Much higher than pairs trading drawdown</div>
       </div>
     </div>
 
@@ -1189,47 +1209,47 @@ Below is a summary of our trading performance across different trade types:
         <thead>
           <tr>
             <th>Performance Metric</th>
-            <th>MSTR-BTC Strategy</th>
-            <th>Hold BTC</th>
+            <th>Pairs Z2.0</th>
             <th>Hold MSTR</th>
-            <th>60/40 Benchmark</th>
+            <th>Hold BTC</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>Annual Return</td>
-            <td>25.12%</td>
-            <td>37.42%</td>
-            <td>31.89%</td>
-            <td>20.59%</td>
+            <td>66.38%</td>
+            <td>159.52%</td>
+            <td>47.04%</td>
           </tr>
           <tr>
             <td>Annual Volatility</td>
-            <td>9.87%</td>
-            <td>41.25%</td>
-            <td>27.34%</td>
-            <td>24.17%</td>
+            <td>42.46%</td>
+            <td>101.69%</td>
+            <td>52.58%</td>
           </tr>
           <tr>
             <td>Sharpe Ratio</td>
-            <td>2.14</td>
-            <td>0.81</td>
-            <td>1.02</td>
-            <td>0.69</td>
+            <td>1.47</td>
+            <td>1.53</td>
+            <td>0.82</td>
           </tr>
           <tr>
             <td>Maximum Drawdown</td>
-            <td>-5.38%</td>
-            <td>-38.15%</td>
-            <td>-29.78%</td>
-            <td>-22.65%</td>
+            <td>-18.01%</td>
+            <td>-49.78%</td>
+            <td>-28.11%</td>
           </tr>
           <tr>
-            <td>Beta to BTC</td>
-            <td>0.18</td>
-            <td>1.00</td>
-            <td>0.63</td>
-            <td>0.71</td>
+            <td>Position Days Ratio</td>
+            <td>12.17%</td>
+            <td>100%</td>
+            <td>100%</td>
+          </tr>
+          <tr>
+            <td>Trade Count</td>
+            <td>34</td>
+            <td>N/A</td>
+            <td>N/A</td>
           </tr>
         </tbody>
       </table>
@@ -1239,29 +1259,27 @@ Below is a summary of our trading performance across different trade types:
   <!-- Performance Calculation Methodology -->
   <div class="stats-box">
     <div class="stats-header">Performance Calculation Methodology</div>
-    <p>The performance statistics above were calculated from the trading blotter and ledger data spanning from April 2024 to April 2025, covering 13 completed trades with actual trade execution details.</p>
+    <p>The performance statistics were calculated from real market data spanning two years of trading history. The strategy was backtested using different Z-score thresholds to identify the optimal configuration.</p>
 
     <ul>
-      <li><strong>Alpha and Beta:</strong> Calculated using regression analysis against a composite benchmark (60% BTC, 40% S&P 500) to represent a diversified crypto-equity portfolio. The alpha represents excess return over what would be predicted by the benchmark exposure.</li>
+      <li><strong>Alpha and Beta:</strong> The MSTR-BTC relationship shows MSTR with a beta of 1.3948 to BTC, indicating that MSTR is approximately 39.5% more volatile than BTC.</li>
 
-      <li><strong>Volatility:</strong> Annualized standard deviation of daily returns, calculated from the daily portfolio value changes in the trading ledger, showing significantly lower volatility than either standalone asset.</li>
+      <li><strong>Volatility:</strong> Annualized standard deviation of daily returns shows significantly lower volatility for the pairs trading strategy (42.46%) compared to a buy-and-hold approach for MSTR (101.69%).</li>
 
-      <li><strong>Geometric Mean Rate of Return:</strong> Calculated as (Final Portfolio Value / Initial Portfolio Value)^(1/Period) - 1, then annualized, showing growth from $500,000 to $524,316.35 over the trading period.</li>
+      <li><strong>Sharpe Ratio:</strong> (Annual Return - Risk-Free Rate) / Annual Volatility, using a 4% annual risk-free rate. The pairs trading strategy (Z-score 2.0) achieved a strong Sharpe ratio of 1.47, comparable to the 1.53 of holding MSTR despite much lower volatility.</li>
 
-      <li><strong>Sharpe Ratio:</strong> (Geometric Mean Return - Risk-Free Rate) / Volatility, using a 4% annual risk-free rate. The high ratio of 2.14 indicates excellent risk-adjusted performance.</li>
+      <li><strong>Maximum Drawdown:</strong> The pairs trading strategy's maximum drawdown (-18.01%) is significantly better than holding MSTR (-49.78%), providing much better capital preservation during market downturns.</li>
 
-      <li><strong>Average Return per Trade:</strong> Calculated from the completed trades in the trading ledger, with an average profit of 1.87% per trade based on the total capital deployed.</li>
-
-      <li><strong>Trades per Year:</strong> Based on the observed trading frequency during the 11.8-month backtest period (April 12, 2024 to April 4, 2025), with 13 completed trades.</li>
+      <li><strong>Trade Frequency:</strong> With a Z-score threshold of 2.0, the strategy generated 34 trades during the backtest period, with a position days ratio of 12.17%, indicating the selective nature of the trading signals.</li>
     </ul>
 
-    <p>These statistics demonstrate that while the pairs trading strategy produces lower absolute returns than simply holding either asset, it achieves this with significantly reduced risk (lower volatility and drawdowns), resulting in superior risk-adjusted returns as measured by the Sharpe ratio.</p>
+    <p>These statistics demonstrate that while the pairs trading strategy produces lower absolute returns than holding MSTR, it achieves this with significantly reduced risk (lower volatility and drawdowns), resulting in comparable risk-adjusted returns as measured by the Sharpe ratio.</p>
   </div>
 
   <!-- Trading Capital Efficiency -->
   <div class="stats-box">
     <div class="stats-header">Trading Capital Efficiency</div>
-    <p>The strategy demonstrates strong capital efficiency with each trade utilizing approximately $32,000-$35,000 of capital per leg (approximately 13-14% of total portfolio value). Based on the detailed ledger data, we can calculate the following efficiency metrics:</p>
+    <p>The strategy demonstrates strong capital efficiency with each trade utilizing approximately 13-14% of total portfolio value. Based on the detailed performance metrics, we can highlight the following efficiency characteristics:</p>
 
     <table class="stats-table">
       <thead>
@@ -1273,34 +1291,34 @@ Below is a summary of our trading performance across different trade types:
       </thead>
       <tbody>
         <tr>
-          <td>Return on Deployed Capital</td>
-          <td>14.04%</td>
-          <td>Average return on capital actively used in trades</td>
-        </tr>
-        <tr>
           <td>Capital Utilization</td>
-          <td>13.43%</td>
-          <td>Average percentage of portfolio deployed in trades</td>
+          <td>12.17%</td>
+          <td>Average percentage of time with active positions</td>
         </tr>
         <tr>
-          <td>Capital Turnover Ratio</td>
-          <td>1.19</td>
-          <td>Annual trading volume / average capital deployed</td>
+          <td>Win Ratio (Z-score 2.0)</td>
+          <td>6.09%</td>
+          <td>Percentage of days with positive returns</td>
+        </tr>
+        <tr>
+          <td>Trade Count</td>
+          <td>34</td>
+          <td>Number of trades with Z-score threshold of 2.0</td>
         </tr>
         <tr>
           <td>Return per Unit of Risk</td>
-          <td>4.67</td>
-          <td>Return / maximum drawdown</td>
+          <td>3.69</td>
+          <td>Annual Return / Max Drawdown</td>
         </tr>
         <tr>
-          <td>Profit Factor</td>
-          <td>3.25</td>
-          <td>Gross profits / gross losses</td>
+          <td>Low Correlation to Market</td>
+          <td>Moderate</td>
+          <td>Strategy provides some diversification benefits</td>
         </tr>
       </tbody>
     </table>
 
-    <p>The capital efficiency metrics highlight that this strategy can be effectively implemented with a relatively modest allocation of total portfolio capital. The conservative capital allocation (13.43% average utilization) helps manage risk while still delivering strong returns. The high return per unit of risk (4.67) and profit factor (3.25) demonstrate the robustness of the strategy across varying market conditions.</p>
+    <p>The selective nature of this strategy (12.17% position days ratio) highlights that it can be effectively implemented with a relatively modest allocation of total portfolio capital. The conservative capital utilization helps manage risk while still delivering strong returns. The high return per unit of risk (3.69) demonstrates the robustness of the strategy compared to traditional buy-and-hold approaches.</p>
   </div>
 </div>
 ```
@@ -1316,41 +1334,9 @@ To evaluate the performance of our pairs trading strategy, we conduct backtests 
 
 import plotly.express as px
 
-# Define backtest thresholds if not already defined earlier
-thresholds_backtest = [0.5, 1.0, 1.5, 2.0, 2.5]
-
-# Ensure backtest_results exists
-backtest_results = {}
-for threshold in thresholds_backtest:
-    backtest_results[f'Pairs_Z{threshold}'] = run_simple_backtest(data, threshold)
-
-# Add buy-and-hold strategies if not already added
-btc_returns = returns['BTC'].loc[data.index[1:]]
-mstr_returns = returns['MSTR'].loc[data.index[1:]]
-btc_cumulative = (1 + btc_returns).cumprod()
-mstr_cumulative = (1 + mstr_returns).cumprod()
-
-backtest_results['Hold_BTC'] = {
-    'Returns': btc_returns,
-    'Cumulative': btc_cumulative,
-    'Annual Return': btc_cumulative.iloc[-1] ** (252 / len(btc_returns)) - 1,
-    'Annual Volatility': btc_returns.std() * np.sqrt(252),
-    'Sharpe Ratio': (btc_cumulative.iloc[-1] ** (252 / len(btc_returns)) - 1 - 0.04) / (btc_returns.std() * np.sqrt(252)),
-    'Max Drawdown': (btc_cumulative / btc_cumulative.cummax() - 1).min()
-}
-
-backtest_results['Hold_MSTR'] = {
-    'Returns': mstr_returns,
-    'Cumulative': mstr_cumulative,
-    'Annual Return': mstr_cumulative.iloc[-1] ** (252 / len(mstr_returns)) - 1,
-    'Annual Volatility': mstr_returns.std() * np.sqrt(252),
-    'Sharpe Ratio': (mstr_cumulative.iloc[-1] ** (252 / len(mstr_returns)) - 1 - 0.04) / (mstr_returns.std() * np.sqrt(252)),
-    'Max Drawdown': (mstr_cumulative / mstr_cumulative.cummax() - 1).min()
-}
-
 # Create DataFrame for cumulative return comparison
 cum_returns_data_all = pd.DataFrame()
-for threshold in thresholds_backtest:
+for threshold in thresholds:
     strategy = f'Pairs_Z{threshold}'
     cum_returns_data_all[strategy] = backtest_results[strategy]['Cumulative']
 
@@ -1359,12 +1345,12 @@ cum_returns_data_all['Hold_BTC'] = backtest_results['Hold_BTC']['Cumulative']
 
 # Reset index for plotting
 cum_returns_data_all = cum_returns_data_all.reset_index()
-cum_returns_data_all = cum_returns_data_all.rename(columns={'index': 'Date'})
+cum_returns_data_all = cum_returns_data_all.rename(columns={'index': 'date'})
 
 # Create interactive cumulative return plot
 fig = px.line(
     cum_returns_data_all,
-    x='Date',
+    x='date',
     y=cum_returns_data_all.columns[1:],
     title='Cumulative Returns of All Strategies',
     labels={
@@ -1401,12 +1387,12 @@ optimal_vs_hold = pd.DataFrame({
     'Pairs_Z2.0': backtest_results['Pairs_Z2.0']['Cumulative'],
     'Hold_MSTR': backtest_results['Hold_MSTR']['Cumulative'],
     'Hold_BTC': backtest_results['Hold_BTC']['Cumulative']
-}).reset_index().rename(columns={'index': 'Date'})
+}).reset_index().rename(columns={'index': 'date'})
 
 # Interactive plot
 fig = px.line(
     optimal_vs_hold,
-    x='Date',
+    x='date',
     y=['Pairs_Z2.0', 'Hold_MSTR', 'Hold_BTC'],
     title='Optimal Pairs Strategy (Z=2.0) vs Buy-and-Hold',
     labels={
@@ -1463,6 +1449,12 @@ Beyond individual trade stop-losses, the strategy incorporates the following ris
 
 ## Conclusion
 
-This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. The optimal configuration uses a Z-score threshold of 2.0, providing a balance between signal quality and trading frequency.
+This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. Based on our real market data analysis, the optimal configuration uses a Z-score threshold of 2.0, providing a balance between signal quality and trading frequency.
+
+While our backtest shows that simply holding MSTR would have yielded higher absolute returns (159.52% annual return vs. 66.38% for pairs trading), the pairs trading approach demonstrates significantly better risk characteristics:
+
+1. **Lower Maximum Drawdown**: -18.01% for pairs trading vs. -49.78% for holding MSTR
+2. **Lower Volatility**: 42.46% for pairs trading vs. 101.69% for holding MSTR
+3. **Comparable Sharpe Ratio**: 1.47 for pairs trading vs. 1.53 for holding MSTR
 
 The strategy's key advantage is its reduced drawdown and lower volatility compared to holding either asset individually, making it valuable for portfolio diversification. Future enhancements will include machine learning-based signal generation and intraday trading capability.
