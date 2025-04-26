@@ -344,9 +344,12 @@ performance_df = performance_df.rename(columns={
 
 # Format for display
 display_df = performance_df.copy()
-for col in ['Annual Return', 'Annual Volatility', 'Max Drawdown']:
+for col in ['Annual Return', 'Annual Volatility']:
     if col in display_df.columns:
         display_df[col] = display_df[col].map('{:.2%}'.format)
+if 'Max Drawdown' in display_df.columns:
+    display_df['Max Drawdown'] = display_df['Max Drawdown'].map('{:.2f}%'.format)
+
 if 'Sharpe Ratio' in display_df.columns:
     display_df['Sharpe Ratio'] = display_df['Sharpe Ratio'].map('{:.2f}'.format)
 if 'Win Ratio' in display_df.columns:
@@ -910,7 +913,7 @@ fig.update_layout(
 fig.show()
 ```
 
-## Conclusion
+## Thoughts
 
 This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. Based on our real market data analysis, the optimal configuration uses a Z-score threshold of 2.5, which provides the best Sharpe ratio among pairs strategies at 0.51.
 
@@ -919,6 +922,14 @@ While our backtest shows that simply holding MSTR would have yielded higher abso
 1. **Lower Maximum Drawdown** for pairs trading vs. holding MSTR
 2. **Lower Volatility** for pairs trading vs. holding MSTR
 
-The strategy's key advantage is its reduced drawdown and lower volatility compared to holding either asset individually, making it valuable for portfolio diversification. The Z-score threshold of 2.5 offers fewer but higher quality trades with a 50% win rate.
+## Potential Improvements
 
-Future enhancements will include machine learning-based signal generation and intraday trading capability.
+The pairs trading strategy could be enhanced through:
+
+1. **Alternative Distribution Fitting**: The current approach assumes normal distribution of the ratio. We could improve signal generation by fitting alternative distributions (Student's t, skewed t, or mixture models) that better capture the fat-tailed nature of financial data.
+
+2. **Dynamic Thresholds**: Instead of fixed Z-score thresholds, implementing adaptive thresholds based on market volatility regimes could improve performance.
+
+3. **Machine Learning Enhancement**: Incorporating additional features beyond just the price ratio (such as volume, volatility, and sentiment indicators) into a machine learning model could better predict mean reversion points.
+
+4. **Multi-Asset Extension**: Expanding beyond the MSTR-BTC pair to include other assets could create a more diversified statistical arbitrage portfolio.
