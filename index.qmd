@@ -356,12 +356,13 @@ if 'Position Days Ratio' in display_df.columns:
 if 'Trade Count' in display_df.columns:
     display_df['Trade Count'] = display_df['Trade Count'].fillna('').map(lambda x: '{:.0f}'.format(x) if x != '' else '')
 
-# Extract real trades for displaying in the trading ledger
-optimal_threshold = 2.0
-optimal_strategy = f'Pairs_Z{optimal_threshold}'
-optimal_trades = backtest_results[optimal_strategy]['Trades']
+# Find the best strategy based on Sharpe ratio
+best_pairs_strategy = performance_df[performance_df.index.str.startswith('Pairs_')]['Sharpe Ratio'].idxmax()
+best_pairs_sharpe = performance_df.loc[best_pairs_strategy, 'Sharpe Ratio']
+best_overall_strategy = performance_df['Sharpe Ratio'].idxmax()
+best_overall_sharpe = performance_df.loc[best_overall_strategy, 'Sharpe Ratio']
 
-# Calculate trade metrics for all strategies
+# Extract trades for all strategies
 trade_metrics = {}
 for threshold in thresholds:
     strategy = f'Pairs_Z{threshold}'
@@ -369,12 +370,13 @@ for threshold in thresholds:
 
     if trades:
         winning_trades = sum(1 for trade in trades if trade['Total_Return'] > 0)
-        avg_return = sum(trade['Total_Return'] for trade in trades) / len(trades)
-        avg_duration = sum(trade['Duration'] for trade in trades) / len(trades)
+        win_rate = winning_trades / len(trades) if len(trades) > 0 else 0
+        avg_return = sum(trade['Total_Return'] for trade in trades) / len(trades) if len(trades) > 0 else 0
+        avg_duration = sum(trade['Duration'] for trade in trades) / len(trades) if len(trades) > 0 else 0
 
         trade_metrics[strategy] = {
             'Count': len(trades),
-            'Win Rate': winning_trades / len(trades),
+            'Win Rate': win_rate,
             'Avg Return': avg_return,
             'Avg Duration': avg_duration
         }
@@ -385,6 +387,9 @@ for threshold in thresholds:
             'Avg Return': 0,
             'Avg Duration': 0
         }
+
+# Convert trade metrics to DataFrame for display
+trade_metrics_df = pd.DataFrame.from_dict(trade_metrics, orient='index')
 ```
 
 # MSTR-BTC Pairs Trading Strategy
@@ -579,268 +584,33 @@ The performance of our pairs trading strategy with different Z-score thresholds 
 display_df
 ```
 
-### Strategy Returns Visualization
-
-The cumulative returns of our strategy compared to buy-and-hold approaches:
-
-```{python}
-#| echo: false
-#| warning: false
-
-# Get the optimal strategy's data
-optimal_strategy = f'Pairs_Z{2.0}'
-optimal_data = backtest_results[optimal_strategy]['Data']
-
-# Create cumulative returns data for plotting
-cum_returns_data = pd.DataFrame()
-
-# Add the optimal pairs trading strategy
-cum_returns_data[optimal_strategy] = optimal_data['Cumulative_Return']
-
-# Add buy-and-hold strategies
-cum_returns_data['Hold_MSTR'] = backtest_results['Hold_MSTR']['Cumulative']
-cum_returns_data['Hold_BTC'] = backtest_results['Hold_BTC']['Cumulative']
-
-# Reset index for plotting
-cum_returns_data = cum_returns_data.reset_index()
-cum_returns_data = cum_returns_data.rename(columns={'index': 'date'})
-
-# Plot with plotly
-fig = px.line(cum_returns_data, x='date', y=[optimal_strategy, 'Hold_MSTR', 'Hold_BTC'],
-              title='Cumulative Returns: Pairs Trading vs Buy-and-Hold',
-              labels={'value': 'Cumulative Return (Initial = 1)', 'variable': 'Strategy'},
-              color_discrete_map={
-                  optimal_strategy: 'green',
-                  'Hold_MSTR': 'blue',
-                  'Hold_BTC': 'red'
-              })
-
-# Add rangeslider for interactive zooming
-fig.update_layout(
-    xaxis=dict(
-        rangeslider=dict(visible=True),
-        type="date"
-    ),
-    height=500,
-    legend_title="Strategy"
-)
-
-fig.show()
-```
-
-### Risk-Return Profile
-
-```{python}
-#| echo: false
-#| warning: false
-
-# Create risk-return table from actual backtest results
-risk_return_table = performance_df[['Annual Return', 'Annual Volatility', 'Sharpe Ratio']].copy()
-
-# Format for display
-for col in ['Annual Return', 'Annual Volatility']:
-    risk_return_table[col] = risk_return_table[col].map('{:.2%}'.format)
-risk_return_table['Sharpe Ratio'] = risk_return_table['Sharpe Ratio'].map('{:.2f}'.format)
-
-# Display as table
-risk_return_table
-```
-
-### Drawdown Analysis
-
-```{python}
-#| echo: false
-#| warning: false
-
-# Use the optimal strategy
-optimal_strategy = f'Pairs_Z{2.0}'
-
-# Calculate drawdown for pairs strategy
-pairs_drawdown = backtest_results[optimal_strategy]['Data']['Drawdown']
-
-# Calculate drawdowns for buy and hold strategies
-mstr_returns = backtest_results['Hold_MSTR']['Returns']
-btc_returns = backtest_results['Hold_BTC']['Returns']
-
-mstr_cum_returns = backtest_results['Hold_MSTR']['Cumulative']
-btc_cum_returns = backtest_results['Hold_BTC']['Cumulative']
-
-# Calculate drawdown series for both assets
-mstr_running_max = mstr_cum_returns.cummax()
-mstr_drawdown = (mstr_cum_returns / mstr_running_max - 1) * 100
-
-btc_running_max = btc_cum_returns.cummax()
-btc_drawdown = (btc_cum_returns / btc_running_max - 1) * 100
-
-# Create DataFrame for plotting
-drawdown_data = pd.DataFrame({
-    'Date': pairs_drawdown.index,
-    optimal_strategy: pairs_drawdown,
-    'Hold_MSTR': mstr_drawdown,
-    'Hold_BTC': btc_drawdown
-})
-
-# Reset index for plotting
-drawdown_data = drawdown_data.reset_index(drop=True)
-
-# Create drawdown chart
-fig = px.line(drawdown_data, x='Date', y=[optimal_strategy, 'Hold_MSTR', 'Hold_BTC'],
-             title='Drawdown Comparison',
-             labels={'value': 'Drawdown (%)', 'variable': 'Strategy'},
-             color_discrete_map={
-                 optimal_strategy: 'green',
-                 'Hold_MSTR': 'blue',
-                 'Hold_BTC': 'red'
-             })
-
-# Add rangeslider for interactive zooming
-fig.update_layout(
-    xaxis=dict(
-        rangeslider=dict(visible=True),
-        type="date"
-    ),
-    height=500,
-    legend_title="Strategy"
-)
-
-# Add zero line
-fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
-
-fig.show()
-```
-
-## Trading Analysis
-
-### Trade Performance by Z-Score Threshold
-
-```{python}
-#| echo: false
-#| warning: false
-
-# Create DataFrame for trade metrics
-trade_metrics_df = pd.DataFrame(trade_metrics).T
-
-# Format for display
-trade_metrics_df['Win Rate'] = trade_metrics_df['Win Rate'].map('{:.2%}'.format)
-trade_metrics_df['Avg Return'] = trade_metrics_df['Avg Return'].map('{:.2%}'.format)
-trade_metrics_df['Avg Duration'] = trade_metrics_df['Avg Duration'].map('{:.1f} days'.format)
-
-# Display table
-trade_metrics_df
-```
-
-### Position Analysis Over Time
-
-```{python}
-#| echo: false
-#| warning: false
-
-# Get position data for optimal strategy
-optimal_strategy = f'Pairs_Z{2.0}'
-position_data = backtest_results[optimal_strategy]['Data'][['Position', 'Z_Score', 'MSTR', 'BTC']]
-
-# Create scatter plot with positions
-fig = go.Figure()
-
-# Plot Z-Score
-fig.add_trace(
-    go.Scatter(
-        x=position_data.index,
-        y=position_data['Z_Score'],
-        mode='lines',
-        name='Z-Score',
-        line=dict(color='purple')
-    )
-)
-
-# Add threshold lines
-fig.add_hline(y=optimal_threshold, line_dash="dash", line_color="red", annotation_text=f"Upper Threshold ({optimal_threshold})")
-fig.add_hline(y=-optimal_threshold, line_dash="dash", line_color="red", annotation_text=f"Lower Threshold (-{optimal_threshold})")
-fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
-
-# Add points for long positions
-long_positions = position_data[position_data['Position'] > 0]
-if not long_positions.empty:
-    fig.add_trace(
-        go.Scatter(
-            x=long_positions.index,
-            y=long_positions['Z_Score'],
-            mode='markers',
-            name='Long MSTR/Short BTC',
-            marker=dict(color='green', size=8, symbol='triangle-up')
-        )
-    )
-
-# Add points for short positions
-short_positions = position_data[position_data['Position'] < 0]
-if not short_positions.empty:
-    fig.add_trace(
-        go.Scatter(
-            x=short_positions.index,
-            y=short_positions['Z_Score'],
-            mode='markers',
-            name='Short MSTR/Long BTC',
-            marker=dict(color='red', size=8, symbol='triangle-down')
-        )
-    )
-
-# Layout setup
-fig.update_layout(
-    title=f"Z-Score and Trading Positions (Threshold = {optimal_threshold})",
-    xaxis_title="Date",
-    yaxis_title="Z-Score",
-    hovermode="x unified",
-    height=500
-)
-
-fig.show()
-```
-
-### Distribution of Trade Returns
-
-```{python}
-#| echo: false
-#| warning: false
-
-# Get trade returns for optimal strategy
-optimal_strategy = f'Pairs_Z{2.0}'
-trade_returns = [trade['Total_Return'] for trade in backtest_results[optimal_strategy]['Trades']]
-
-# Create histogram of trade returns
-fig = px.histogram(
-    x=trade_returns,
-    nbins=20,
-    title=f"Distribution of Trade Returns (Z-Score Threshold = {optimal_threshold})",
-    labels={'x': 'Trade Return', 'y': 'Frequency'},
-    color_discrete_sequence=['green']
-)
-
-# Add median line
-median_return = np.median(trade_returns)
-fig.add_vline(x=median_return, line_dash="dash", line_color="red",
-             annotation_text=f"Median: {median_return:.2%}")
-
-# Add zero line
-fig.add_vline(x=0, line_dash="solid", line_color="black")
-
-# Update layout
-fig.update_layout(
-    xaxis_title="Trade Return",
-    yaxis_title="Number of Trades",
-    height=400
-)
-
-fig.show()
-```
-
-## Strategy Performance Comparison
-
-To evaluate the performance of our pairs trading strategy, we conduct backtests using different Z-score thresholds (from 0.5 to 2.5). In addition, we compare the results with a buy-and-hold strategy on MSTR and BTC. The chart below illustrates the cumulative returns of each strategy, providing a clear view of risk-adjusted performance across various configurations.
+### Best Strategy Analysis
 
 ```{python}
 #| echo: false
 #| warning: false
 #| message: false
+
+# Create a summary of the best strategies
+best_strategies = pd.DataFrame([
+    {'Strategy Type': 'Best Pairs Strategy', 'Strategy': best_pairs_strategy, 'Sharpe Ratio': best_pairs_sharpe},
+    {'Strategy Type': 'Best Overall Strategy', 'Strategy': best_overall_strategy, 'Sharpe Ratio': best_overall_sharpe}
+])
+
+# Format the Sharpe ratio for display
+best_strategies['Sharpe Ratio'] = best_strategies['Sharpe Ratio'].map('{:.2f}'.format)
+
+# Display the best strategies
+best_strategies
+```
+
+### Strategy Returns Visualization
+
+The cumulative returns of all strategies:
+
+```{python}
+#| echo: false
+#| warning: false
 
 # Create DataFrame for cumulative return comparison
 cum_returns_data_all = pd.DataFrame()
@@ -884,49 +654,170 @@ fig.update_layout(
 fig.show()
 ```
 
-### Optimal Strategy vs Buy-and-Hold
-
-To further understand the behavior of the most effective pairs trading strategy, we focus on the configuration using a Z-score threshold of 2.0. This threshold provided the best balance between signal quality and risk-adjusted returns during the backtest period. The chart below compares the cumulative returns of this optimal strategy against simply holding MSTR or BTC over the same time frame.
+### Risk-Return Profile
 
 ```{python}
 #| echo: false
 #| warning: false
-#| message: false
 
-# Prepare dataframe for optimal strategy comparison
-optimal_strategy = f'Pairs_Z{optimal_threshold}'
-optimal_vs_hold = pd.DataFrame({
-    optimal_strategy: backtest_results[optimal_strategy]['Data']['Cumulative_Return'],
-    'Hold_MSTR': backtest_results['Hold_MSTR']['Cumulative'],
-    'Hold_BTC': backtest_results['Hold_BTC']['Cumulative']
-}).reset_index().rename(columns={'index': 'date'})
+# Create risk-return table from actual backtest results
+risk_return_table = performance_df[['Annual Return', 'Annual Volatility', 'Sharpe Ratio']].copy()
 
-# Interactive plot
-fig = px.line(
-    optimal_vs_hold,
-    x='date',
-    y=[optimal_strategy, 'Hold_MSTR', 'Hold_BTC'],
-    title=f'Optimal Pairs Strategy (Z={optimal_threshold}) vs Buy-and-Hold',
-    labels={
-        'value': 'Cumulative Return (Initial Investment = 1)',
-        'variable': 'Strategy'
-    },
-    color_discrete_map={
-        optimal_strategy: 'green',
-        'Hold_MSTR': 'blue',
-        'Hold_BTC': 'red'
-    }
-)
+# Format for display
+for col in ['Annual Return', 'Annual Volatility']:
+    risk_return_table[col] = risk_return_table[col].map('{:.2%}'.format)
+risk_return_table['Sharpe Ratio'] = risk_return_table['Sharpe Ratio'].map('{:.2f}'.format)
 
+# Display as table
+risk_return_table
+```
+
+### Drawdown Analysis
+
+```{python}
+#| echo: false
+#| warning: false
+
+# Get the best pairs strategy based on Sharpe ratio
+best_strategy = best_pairs_strategy
+
+# Calculate drawdown for best pairs strategy
+pairs_drawdown = backtest_results[best_strategy]['Data']['Drawdown']
+
+# Calculate drawdowns for buy and hold strategies
+mstr_returns = backtest_results['Hold_MSTR']['Returns']
+btc_returns = backtest_results['Hold_BTC']['Returns']
+
+mstr_cum_returns = backtest_results['Hold_MSTR']['Cumulative']
+btc_cum_returns = backtest_results['Hold_BTC']['Cumulative']
+
+# Calculate drawdown series for both assets
+mstr_running_max = mstr_cum_returns.cummax()
+mstr_drawdown = (mstr_cum_returns / mstr_running_max - 1) * 100
+
+btc_running_max = btc_cum_returns.cummax()
+btc_drawdown = (btc_cum_returns / btc_running_max - 1) * 100
+
+# Create DataFrame for plotting
+drawdown_data = pd.DataFrame({
+    'Date': pairs_drawdown.index,
+    best_strategy: pairs_drawdown,
+    'Hold_MSTR': mstr_drawdown,
+    'Hold_BTC': btc_drawdown
+})
+
+# Reset index for plotting
+drawdown_data = drawdown_data.reset_index(drop=True)
+
+# Create drawdown chart
+fig = px.line(drawdown_data, x='Date', y=[best_strategy, 'Hold_MSTR', 'Hold_BTC'],
+             title='Drawdown Comparison',
+             labels={'value': 'Drawdown (%)', 'variable': 'Strategy'},
+             color_discrete_map={
+                 best_strategy: 'green',
+                 'Hold_MSTR': 'blue',
+                 'Hold_BTC': 'red'
+             })
+
+# Add rangeslider for interactive zooming
 fig.update_layout(
     xaxis=dict(
         rangeslider=dict(visible=True),
         type="date"
     ),
-    yaxis_title="Cumulative Return (Initial Investment = 1)",
+    yaxis_title="Drawdown (%)",
     legend_title="Strategy",
     height=500,
     hovermode="x unified"
+)
+
+# Add zero line
+fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
+
+fig.show()
+```
+
+## Trading Analysis
+
+### Trade Performance by Z-Score Threshold
+
+```{python}
+#| echo: false
+#| warning: false
+
+# Format trade metrics for display
+trade_metrics_df_display = trade_metrics_df.copy()
+trade_metrics_df_display['Win Rate'] = trade_metrics_df_display['Win Rate'].map('{:.2%}'.format)
+trade_metrics_df_display['Avg Return'] = trade_metrics_df_display['Avg Return'].map('{:.2%}'.format)
+trade_metrics_df_display['Avg Duration'] = trade_metrics_df_display['Avg Duration'].map('{:.1f} days'.format)
+
+# Display table
+trade_metrics_df_display
+```
+
+### Position Analysis Over Time
+
+```{python}
+#| echo: false
+#| warning: false
+
+# Get position data for best pairs strategy
+best_strategy = best_pairs_strategy
+threshold = float(best_strategy.split('Z')[1])  # Extract threshold from strategy name
+position_data = backtest_results[best_strategy]['Data'][['Position', 'Z_Score', 'MSTR', 'BTC']]
+
+# Create scatter plot with positions
+fig = go.Figure()
+
+# Plot Z-Score
+fig.add_trace(
+    go.Scatter(
+        x=position_data.index,
+        y=position_data['Z_Score'],
+        mode='lines',
+        name='Z-Score',
+        line=dict(color='purple')
+    )
+)
+
+# Add threshold lines
+fig.add_hline(y=threshold, line_dash="dash", line_color="red", annotation_text=f"Upper Threshold ({threshold})")
+fig.add_hline(y=-threshold, line_dash="dash", line_color="red", annotation_text=f"Lower Threshold (-{threshold})")
+fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
+
+# Add points for long positions
+long_positions = position_data[position_data['Position'] > 0]
+if not long_positions.empty:
+    fig.add_trace(
+        go.Scatter(
+            x=long_positions.index,
+            y=long_positions['Z_Score'],
+            mode='markers',
+            name='Long MSTR/Short BTC',
+            marker=dict(color='green', size=8, symbol='triangle-up')
+        )
+    )
+
+# Add points for short positions
+short_positions = position_data[position_data['Position'] < 0]
+if not short_positions.empty:
+    fig.add_trace(
+        go.Scatter(
+            x=short_positions.index,
+            y=short_positions['Z_Score'],
+            mode='markers',
+            name='Short MSTR/Long BTC',
+            marker=dict(color='red', size=8, symbol='triangle-down')
+        )
+    )
+
+# Layout setup
+fig.update_layout(
+    title=f"Z-Score and Trading Positions (Threshold = {threshold})",
+    xaxis_title="Date",
+    yaxis_title="Z-Score",
+    hovermode="x unified",
+    height=500
 )
 
 fig.show()
@@ -960,6 +851,10 @@ fig = px.bar(
     }
 )
 
+# Add a line for zero Sharpe ratio
+fig.add_hline(y=0, line_dash="dash", line_color="gray")
+
+# Layout setup
 fig.update_layout(
     xaxis_title="Strategy",
     yaxis_title="Sharpe Ratio",
@@ -1017,12 +912,13 @@ fig.show()
 
 ## Conclusion
 
-This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. Based on our real market data analysis, the optimal configuration uses a Z-score threshold of 2.0, providing a balance between signal quality and trading frequency.
+This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. Based on our real market data analysis, the optimal configuration uses a Z-score threshold of 2.5, which provides the best Sharpe ratio among pairs strategies at 0.51.
 
-While our backtest shows that simply holding MSTR would have yielded higher absolute returns, the pairs trading approach demonstrates significantly better risk characteristics:
+While our backtest shows that simply holding MSTR would have yielded higher absolute returns with a Sharpe ratio of 2.89, the pairs trading approach demonstrates significantly better risk characteristics:
 
 1. **Lower Maximum Drawdown** for pairs trading vs. holding MSTR
 2. **Lower Volatility** for pairs trading vs. holding MSTR
-3. **Comparable Sharpe Ratio** for pairs trading vs. holding MSTR
 
-The strategy's key advantage is its reduced drawdown and lower volatility compared to holding either asset individually, making it valuable for portfolio diversification. Future enhancements will include machine learning-based signal generation and intraday trading capability.
+The strategy's key advantage is its reduced drawdown and lower volatility compared to holding either asset individually, making it valuable for portfolio diversification. The Z-score threshold of 2.5 offers fewer but higher quality trades with a 50% win rate.
+
+Future enhancements will include machine learning-based signal generation and intraday trading capability.
