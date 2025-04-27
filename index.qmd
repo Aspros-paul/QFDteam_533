@@ -158,8 +158,9 @@ def backtest_pairs_strategy(data, threshold, risk_free_rate=0.04):
 
     # Track trade entries and exits
     df['Entry'] = df['Position'] != df['Position'].shift(1)
-    df['Exit'] = df['Position'].shift(1) != 0
-    df.loc[df['Entry'] & df['Exit'], 'Exit'] = False  # If both entry and exit, it's an entry
+
+    # CORRECTED EXIT LOGIC: Exit when position changes from non-zero to zero
+    df['Exit'] = (df['Position'] == 0) & (df['Position'].shift(1) != 0)
 
     # Calculate position values (assume equal dollar amounts in both legs)
     df['MSTR_Position'] = df['Position'] * 1  # +1 for long, -1 for short
@@ -627,9 +628,10 @@ This mean-reversion approach is implemented by setting the position to zero when
 ```python
 # Track trade entries and exits
 df['Entry'] = df['Position'] != df['Position'].shift(1)
-df['Exit'] = df['Position'].shift(1) != 0
-df.loc[df['Entry'] & df['Exit'], 'Exit'] = False  # If both entry and exit, it's an entry
+df['Exit'] = (df['Position'] == 0) & (df['Position'].shift(1) != 0)
 ```
+
+With this corrected exit logic, a position is only marked for exit when the position actually changes from non-zero to zero, which happens when the Z-score returns to the normal range.
 
 ### Threshold Selection
 
