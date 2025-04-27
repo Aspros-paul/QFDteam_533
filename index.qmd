@@ -613,7 +613,7 @@ df.loc[df['Z_Score'] > threshold, 'Signal'] = -1  # Short MSTR, Long BTC
 df['Position'] = df['Signal'].shift(1)
 ```
 
-The strategy uses a one-day delay between signal generation and position execution to avoid lookahead bias, ensuring our backtest accurately reflects real-world trading constraints.
+The strategy uses a one-day delay between signal generation and position execution to avoid lookahead bias, ensuring our backtest accurately reflects real-world trading constraints. If the day before z-score exceed the threshold but the second day quickly return to normal, the trade will not execute.
 
 ### Exit Conditions
 
