@@ -1025,6 +1025,207 @@ fig.update_layout(
 fig.show()
 ```
 
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+# Get the best strategy data
+best_strategy = best_pairs_strategy
+best_strategy_data = backtest_results[best_strategy]['Data']
+best_strategy_trades = backtest_results[best_strategy]['Trades']
+
+# Create blotter table with detailed trade information
+def create_simple_blotter(trades_list, max_rows=10):
+    """Create a detailed trade blotter showing first N rows"""
+    if not trades_list:
+        return pd.DataFrame(columns=[
+            'TimeEntry', 'TimeExit', 'PositionBTC', 'PositionMSTR', 'QuantityBTC',
+            'EntryBTCvalue', 'ExitBTCvalue', 'P&L BTC value',
+            'EntryMSTRvalue', 'ExitMSTRvalue', 'P&LMSTRvalue', 'Success/Fail'
+        ])
+
+    blotter_data = []
+
+    for trade in trades_list:
+        # Calculate position directions
+        pos_btc = "Short" if trade['Position'] > 0 else "Long"
+        pos_mstr = "Long" if trade['Position'] > 0 else "Short"
+
+        # Assume equal dollar amount invested in both assets
+        notional_value = 10000  # $10,000 per side for illustration
+
+        # Calculate BTC quantity
+        btc_entry_price = trade['Entry_BTC_Price']
+        btc_quantity = notional_value / btc_entry_price
+
+        # Calculate entry/exit values
+        btc_entry_value = btc_quantity * btc_entry_price
+        btc_exit_value = btc_quantity * trade['Exit_BTC_Price']
+
+        mstr_entry_price = trade['Entry_MSTR_Price']
+        mstr_quantity = notional_value / mstr_entry_price
+        mstr_entry_value = mstr_quantity * mstr_entry_price
+        mstr_exit_value = mstr_quantity * trade['Exit_MSTR_Price']
+
+        # Calculate P&L
+        if pos_btc == "Short":
+            btc_pnl = btc_entry_value - btc_exit_value
+        else:
+            btc_pnl = btc_exit_value - btc_entry_value
+
+        if pos_mstr == "Long":
+            mstr_pnl = mstr_exit_value - mstr_entry_value
+        else:
+            mstr_pnl = mstr_entry_value - mstr_exit_value
+
+        # Determine success/failure
+        success_fail = "Success" if trade['Total_Return'] > 0 else "Fail"
+
+        # Add to blotter
+        blotter_data.append({
+            'TimeEntry': trade['Entry_Date'].strftime('%Y-%m-%d'),
+            'TimeExit': trade['Exit_Date'].strftime('%Y-%m-%d'),
+            'PositionBTC': pos_btc,
+            'PositionMSTR': pos_mstr,
+            'QuantityBTC': f"{btc_quantity:.6f}",
+            'EntryBTCvalue': f"${btc_entry_value:.2f}",
+            'ExitBTCvalue': f"${btc_exit_value:.2f}",
+            'P&L BTC value': f"${btc_pnl:.2f}",
+            'EntryMSTRvalue': f"${mstr_entry_value:.2f}",
+            'ExitMSTRvalue': f"${mstr_exit_value:.2f}",
+            'P&LMSTRvalue': f"${mstr_pnl:.2f}",
+            'Success/Fail': success_fail
+        })
+
+    # Convert to DataFrame and limit to max_rows
+    blotter_df = pd.DataFrame(blotter_data)
+    return blotter_df.head(max_rows)
+
+# Create ledger table with daily portfolio values
+def create_simple_ledger(strategy_data, initial_capital=100000, max_rows=10):
+    """Create a portfolio ledger showing first N rows"""
+    if strategy_data.empty:
+        return pd.DataFrame(columns=['Date', 'BTCposition', 'MSTRposition', 'Daily Return', 'Portfolio value'])
+
+    ledger_data = []
+    portfolio_value = initial_capital
+
+    for date, row in strategy_data.iterrows():
+        # Update portfolio value
+        if len(ledger_data) > 0:  # Skip first day calculation
+            portfolio_value = portfolio_value * (1 + row['Strategy_Return'])
+
+        ledger_data.append({
+            'Date': date.strftime('%Y-%m-%d'),
+            'BTCposition': "Short" if row['BTC_Position'] < 0 else "Long" if row['BTC_Position'] > 0 else "None",
+            'MSTRposition': "Long" if row['MSTR_Position'] > 0 else "Short" if row['MSTR_Position'] < 0 else "None",
+            'Daily Return': f"{row['Strategy_Return']*100:.2f}%" if 'Strategy_Return' in row else "0.00%",
+            'Portfolio value': f"${portfolio_value:.2f}"
+        })
+
+    # Convert to DataFrame and limit to max_rows
+    ledger_df = pd.DataFrame(ledger_data)
+    return ledger_df.head(max_rows)
+
+# Create the blotter and ledger with first 10 rows
+blotter = create_simple_blotter(best_strategy_trades, 10)
+ledger = create_simple_ledger(best_strategy_data, 100000, 10)
+
+# Print information about the strategy
+print(f"## Trade Blotter and Portfolio Ledger for {best_strategy}")
+print(f"Showing 10 records out of {len(best_strategy_trades)} trades and {len(best_strategy_data)} portfolio days")
+```
+
+## Trade Blotter
+
+The trade blotter provides detailed information about each entry and exit point in our pairs trading strategy, including position sizes, values, and profit/loss for each leg of the trade:
+
+```{python}
+#| echo: false
+
+# Format the blotter for display
+styled_blotter = blotter.style.apply(
+    lambda x: ['color: green' if v == 'Success' else 'color: red' if v == 'Fail' else '' for v in x],
+    subset=['Success/Fail']
+).apply(
+    lambda x: ['color: green' if not str(v).startswith('$-') and str(v) != '$0.00' else 'color: red' if str(v).startswith('$-') else '' for v in x],
+    subset=['P&L BTC value', 'P&LMSTRvalue']
+).set_table_styles([
+    {'selector': 'th', 'props': [('background-color', '#f2f2f2'),
+                                ('color', 'black'),
+                                ('font-weight', 'bold'),
+                                ('text-align', 'center'),
+                                ('border', '1px solid black')]},
+    {'selector': 'td', 'props': [('border', '1px solid black'),
+                                ('padding', '5px')]}
+])
+
+styled_blotter
+```
+
+## Portfolio Ledger
+
+The portfolio ledger tracks the daily positions and cumulative performance of our trading strategy, showing how the portfolio value evolves over time:
+
+```{python}
+#| echo: false
+
+# Format the ledger for display
+styled_ledger = ledger.style.apply(
+    lambda x: ['color: green' if not str(v).startswith('-') and str(v) != '0.00%' else 'color: red' if str(v).startswith('-') else '' for v in x],
+    subset=['Daily Return']
+).set_table_styles([
+    {'selector': 'th', 'props': [('background-color', '#f2f2f2'),
+                                ('color', 'black'),
+                                ('font-weight', 'bold'),
+                                ('text-align', 'center'),
+                                ('border', '1px solid black')]},
+    {'selector': 'td', 'props': [('border', '1px solid black'),
+                                ('padding', '5px')]}
+])
+
+styled_ledger
+```
+
+## Trade Summary
+
+```{python}
+#| echo: false
+
+# Create a simple summary of the trading performance
+winning_trades = sum(1 for trade in best_strategy_trades if trade['Total_Return'] > 0)
+total_trades = len(best_strategy_trades)
+win_rate = winning_trades / total_trades if total_trades > 0 else 0
+
+# Calculate portfolio performance
+initial_capital = 100000
+final_value = initial_capital * best_strategy_data['Cumulative_Return'].iloc[-1]
+total_return = (final_value / initial_capital - 1) * 100
+
+# Create a summary dataframe
+summary_data = {
+    'Metric': [
+        'Total Trades',
+        'Winning Trades',
+        'Win Rate',
+        'Initial Capital',
+        'Final Portfolio Value',
+        'Total Return'
+    ],
+    'Value': [
+        f"{total_trades}",
+        f"{winning_trades}",
+        f"{win_rate:.2%}",
+        f"${initial_capital:,.2f}",
+        f"${final_value:,.2f}",
+        f"{total_return:.2f}%"
+    ]
+}
+
+
+```
+
 ## Thoughts
 
 This pairs trading strategy exploiting the MSTR-BTC relationship provides a market-neutral approach that can complement traditional long-only cryptocurrency and equity strategies. Based on our real market data analysis, the optimal configuration uses a Z-score threshold of 2.5, which provides the best Sharpe ratio among pairs strategies at 0.51.
@@ -1045,3 +1246,4 @@ The pairs trading strategy could be enhanced through:
 3. **Machine Learning Enhancement**: Incorporating additional features beyond just the price ratio (such as volume, volatility, and sentiment indicators) into a machine learning model could better predict mean reversion points.
 
 4. **Multi-Asset Extension**: Expanding beyond the MSTR-BTC pair to include other assets could create a more diversified statistical arbitrage portfolio.
+
