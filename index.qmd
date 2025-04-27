@@ -403,7 +403,7 @@ trade_metrics_df = pd.DataFrame.from_dict(trade_metrics, orient='index')
 Here's a video explaining our MSTR-BTC pairs trading strategy:
 
 <div class="ratio ratio-16x9">
-  <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+  <iframe src="https://www.youtube.com/embed/ldYSnXqDbR8"
           title="MSTR-BTC Strategy Explanation"
           allowfullscreen></iframe>
 </div>
