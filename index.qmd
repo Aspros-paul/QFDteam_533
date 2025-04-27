@@ -573,6 +573,84 @@ metrics = pd.DataFrame({
 
 metrics
 ```
+## Trade Entry and Exit Mechanism
+
+### Z-Score Calculation
+
+The core of our pairs trading strategy revolves around a statistical measure called the Z-score. This metric quantifies how far the MSTR/BTC price ratio deviates from its historical mean in terms of standard deviations:
+
+1. We first calculate the daily ratio between MSTR and BTC prices:
+   ```python
+   data['Ratio'] = data['MSTR'] / data['BTC']
+   ```
+
+2. Then we calculate a 20-day moving average and standard deviation of this ratio:
+   ```python
+   data['Ratio_MA'] = data['Ratio'].rolling(window=20).mean()
+   data['Ratio_STD'] = data['Ratio'].rolling(window=20).std()
+   ```
+
+3. Finally, we compute the Z-score as the number of standard deviations the current ratio is from its 20-day moving average:
+   ```python
+   data['Z_Score'] = (data['Ratio'] - data['Ratio_MA']) / data['Ratio_STD']
+   ```
+
+### Entry Conditions
+
+Our strategy generates trading signals based on the Z-score crossing specific thresholds:
+
+- When Z-score falls below negative threshold (-0.5, -1.0, etc.): This indicates MSTR is relatively undervalued compared to BTC. We enter a position going **long MSTR** and **short BTC**.
+
+- When Z-score rises above positive threshold (0.5, 1.0, etc.): This indicates MSTR is relatively overvalued compared to BTC. We enter a position going **short MSTR** and **long BTC**.
+
+```python
+# Create position signals based on Z-score
+df['Signal'] = 0
+df.loc[df['Z_Score'] < -threshold, 'Signal'] = 1   # Long MSTR, Short BTC
+df.loc[df['Z_Score'] > threshold, 'Signal'] = -1  # Short MSTR, Long BTC
+
+# Apply signal with one-day delay to avoid lookahead bias
+df['Position'] = df['Signal'].shift(1)
+```
+
+The strategy uses a one-day delay between signal generation and position execution to avoid lookahead bias, ensuring our backtest accurately reflects real-world trading constraints.
+
+### Exit Conditions
+
+Positions are exited when the Z-score reverts toward the mean, specifically:
+
+- A long MSTR/short BTC position is exited when the Z-score rises back above -threshold
+- A short MSTR/long BTC position is exited when the Z-score falls back below threshold
+
+This mean-reversion approach is implemented by setting the position to zero when the Z-score returns to the range between the negative and positive thresholds:
+
+```python
+# Track trade entries and exits
+df['Entry'] = df['Position'] != df['Position'].shift(1)
+df['Exit'] = df['Position'].shift(1) != 0
+df.loc[df['Entry'] & df['Exit'], 'Exit'] = False  # If both entry and exit, it's an entry
+```
+
+### Threshold Selection
+
+The choice of Z-score threshold represents a trade-off between trading frequency and signal quality:
+
+- **Lower thresholds** (e.g., 0.5): More frequent trades but potentially weaker signals
+- **Higher thresholds** (e.g., 2.5): Fewer trades but stronger statistical divergence signals
+
+Our backtest analyzes multiple thresholds (0.5, 1.0, 1.5, 2.0, 2.5) to identify the optimal balance. As shown in the performance metrics, the Z-score threshold of 2.5 provides the best risk-adjusted returns as measured by the Sharpe ratio.
+
+### Trade Execution Logic
+
+When a trade is initiated, equal dollar amounts are allocated to both legs of the pairs trade (long and short). The position sizes are kept constant throughout the trade duration until an exit signal is generated:
+
+```python
+# Calculate position values (assume equal dollar amounts in both legs)
+df['MSTR_Position'] = df['Position'] * 1  # +1 for long, -1 for short
+df['BTC_Position'] = -df['Position'] * 1  # Opposite of MSTR position
+```
+
+This market-neutral approach allows the strategy to potentially profit regardless of the overall market direction, focusing instead on the relative performance between MSTR and BTC.
 
 ## Backtest Results
 
@@ -764,10 +842,13 @@ trade_metrics_df_display
 #| echo: false
 #| warning: false
 
-# Get position data for best pairs strategy
+# Get position and trade data for best pairs strategy
 best_strategy = best_pairs_strategy
 threshold = float(best_strategy.split('Z')[1])  # Extract threshold from strategy name
-position_data = backtest_results[best_strategy]['Data'][['Position', 'Z_Score', 'MSTR', 'BTC']]
+
+# Access the actual trades data instead of all position days
+trades = backtest_results[best_strategy]['Trades']
+position_data = backtest_results[best_strategy]['Data']
 
 # Create scatter plot with positions
 fig = go.Figure()
@@ -788,38 +869,67 @@ fig.add_hline(y=threshold, line_dash="dash", line_color="red", annotation_text=f
 fig.add_hline(y=-threshold, line_dash="dash", line_color="red", annotation_text=f"Lower Threshold (-{threshold})")
 fig.add_hline(y=0, line_dash="solid", line_color="black", opacity=0.3)
 
-# Add points for long positions
-long_positions = position_data[position_data['Position'] > 0]
-if not long_positions.empty:
+# Plot trade entries - using the actual trades data
+for i, trade in enumerate(trades):
+    entry_date = trade['Entry_Date']
+    entry_zscore = trade['Entry_Z_Score']
+    position_type = trade['Entry_Type']
+
+    marker_color = 'green' if position_type == 'Long MSTR/Short BTC' else 'red'
+    marker_symbol = 'triangle-up' if position_type == 'Long MSTR/Short BTC' else 'triangle-down'
+
     fig.add_trace(
         go.Scatter(
-            x=long_positions.index,
-            y=long_positions['Z_Score'],
+            x=[entry_date],
+            y=[entry_zscore],
             mode='markers',
-            name='Long MSTR/Short BTC',
-            marker=dict(color='green', size=8, symbol='triangle-up')
+            name=position_type + ' Entry',
+            marker=dict(color=marker_color, size=10, symbol=marker_symbol),
+            text=f"Trade {i+1}: {position_type}<br>Date: {entry_date.strftime('%Y-%m-%d')}<br>Z-Score: {entry_zscore:.2f}",
+            hoverinfo='text',
+            showlegend=(i == 0 or (i > 0 and trades[i-1]['Entry_Type'] != position_type))  # Only show in legend once for each type
         )
     )
 
-# Add points for short positions
-short_positions = position_data[position_data['Position'] < 0]
-if not short_positions.empty:
-    fig.add_trace(
-        go.Scatter(
-            x=short_positions.index,
-            y=short_positions['Z_Score'],
-            mode='markers',
-            name='Short MSTR/Long BTC',
-            marker=dict(color='red', size=8, symbol='triangle-down')
+    # Add exit points if available
+    if 'Exit_Date' in trade and 'Exit_Z_Score' in trade:
+        exit_date = trade['Exit_Date']
+        exit_zscore = trade['Exit_Z_Score']
+
+        fig.add_trace(
+            go.Scatter(
+                x=[exit_date],
+                y=[exit_zscore],
+                mode='markers',
+                name='Trade Exit',
+                marker=dict(color='black', size=8, symbol='x'),
+                text=f"Trade {i+1} Exit<br>Date: {exit_date.strftime('%Y-%m-%d')}<br>Z-Score: {exit_zscore:.2f}<br>Return: {trade['Total_Return']:.2%}",
+                hoverinfo='text',
+                showlegend=(i == 0)  # Only show in legend for first occurrence
+            )
         )
-    )
+
+# Add annotation with trade count
+fig.add_annotation(
+    x=0.02,
+    y=0.98,
+    xref="paper",
+    yref="paper",
+    text=f"Total Trades: {len(trades)}",
+    showarrow=False,
+    font=dict(size=14, color="black"),
+    align="left",
+    bgcolor="white",
+    bordercolor="black",
+    borderwidth=1
+)
 
 # Layout setup
 fig.update_layout(
     title=f"Z-Score and Trading Positions (Threshold = {threshold})",
     xaxis_title="Date",
     yaxis_title="Z-Score",
-    hovermode="x unified",
+    hovermode="closest",
     height=500
 )
 
