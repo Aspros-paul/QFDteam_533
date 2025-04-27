@@ -400,6 +400,14 @@ trade_metrics_df = pd.DataFrame.from_dict(trade_metrics, orient='index')
 
 ## Strategy Overview
 
+Here's a video explaining our MSTR-BTC pairs trading strategy:
+
+<div class="ratio ratio-16x9">
+  <iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+          title="MSTR-BTC Strategy Explanation"
+          allowfullscreen></iframe>
+</div>
+
 This trading strategy exploits the statistical relationship between MicroStrategy (MSTR) stock and Bitcoin (BTC). Since MicroStrategy has adopted a strategy of holding substantial Bitcoin reserves on its balance sheet, the two assets demonstrate a high correlation while occasionally experiencing temporary price divergences. The strategy aims to capitalize on these divergences through pairs trading techniques.
 
 ### Key Components
